@@ -12,7 +12,9 @@ from fastapi.responses import HTMLResponse, JSONResponse
 app = FastAPI(title="Gema-IL Data Manager")
 
 BASE_DIR = Path(__file__).parent
-DB_PATH = BASE_DIR / "data.db"
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(exist_ok=True)
+DB_PATH = DATA_DIR / "data.db"
 
 
 # ─── Database ────────────────────────────────────────────────────────────────

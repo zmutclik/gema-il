@@ -1,0 +1,11 @@
+services:
+  gema-il:
+    build: .
+    container_name: gema-il
+    restart: unless-stopped
+    ports:
+      - "8031:8031"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
