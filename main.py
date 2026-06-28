@@ -771,7 +771,7 @@ async def generate_data(request: Request, username: str):
 
 - nama_depan → nama depan Indonesia (random, bervariasi)
 - nama_belakang → nama belakang Indonesia (random, bervariasi)
-- email → kombinasi nama_depan + 1 angka random + nama_belakang + angka random, semua pakai @gmail.com, lowercase
+- email → kombinasi nama_depan + 1 angka random + nama_belakang + 4 angka random sampai 5 angka random, semua pakai @gmail.com, lowercase
 - tanggal_lahir → format YYYY-MM-DD, umur random antara 4 sampai 11 tahun
 - gender → P atau W (random)
 - password → semuanya disamakan "{password}"
