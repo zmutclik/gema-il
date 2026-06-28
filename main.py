@@ -32,7 +32,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS records (
             uid TEXT PRIMARY KEY,
             username TEXT NOT NULL,
-            nama TEXT NOT NULL,
+            nama_depan TEXT NOT NULL,
+            nama_belakang TEXT NOT NULL DEFAULT '',
             email TEXT NOT NULL,
             tanggal_lahir TEXT NOT NULL,
             gender TEXT NOT NULL,
@@ -40,6 +41,28 @@ def init_db():
             status TEXT NOT NULL DEFAULT 'antrian'
         )
     """)
+    # Migration: add nama_depan/nama_belakang if upgrading from old schema
+    try:
+        conn.execute("ALTER TABLE records ADD COLUMN nama_depan TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE records ADD COLUMN nama_belakang TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    # Migrate existing nama → nama_depan + nama_belakang
+    # Check if old 'nama' column still exists
+    cols = [c[1] for c in conn.execute("PRAGMA table_info(records)").fetchall()]
+    if "nama" in cols:
+        old_rows = conn.execute(
+            "SELECT uid, nama FROM records WHERE nama_depan = '' AND nama IS NOT NULL AND nama != ''"
+        ).fetchall()
+        for row in old_rows:
+            nama_depan, nama_belakang = split_name(row["nama"])
+            conn.execute(
+                "UPDATE records SET nama_depan = ?, nama_belakang = ? WHERE uid = ?",
+                (nama_depan, nama_belakang, row["uid"]),
+            )
     conn.commit()
     conn.close()
 
@@ -55,6 +78,16 @@ def strip_email(raw: str) -> str:
     return raw.strip().split("@")[0].lower()
 
 
+def split_name(nama: str) -> tuple:
+    """Split full name into (nama_depan, nama_belakang)."""
+    parts = nama.strip().split(maxsplit=1)
+    if len(parts) == 0:
+        return ("", "")
+    elif len(parts) == 1:
+        return (parts[0], "")
+    else:
+        return (parts[0], parts[1])
+
 def insert_records(username: str, rows: list[dict]) -> int:
     """Insert multiple records into DB. Returns count of inserted rows."""
     conn = get_db()
@@ -65,17 +98,22 @@ def insert_records(username: str, rows: list[dict]) -> int:
             email = strip_email(r.get("email", ""))
             if not email:
                 continue
-            nama = r.get("nama", "").strip()
+            # Support both 'nama' (full name) and 'nama_depan'+'nama_belakang' columns
+            if "nama_depan" in r and "nama_belakang" in r:
+                nama_depan = r.get("nama_depan", "").strip()
+                nama_belakang = r.get("nama_belakang", "").strip()
+            else:
+                nama_depan, nama_belakang = split_name(r.get("nama", ""))
             tanggal_lahir = r.get("tanggal_lahir", "").strip()
             gender = r.get("gender", "").strip().upper()
             password = r.get("password", "").strip()
-            if not nama or not tanggal_lahir or gender not in ("P", "W"):
+            if not nama_depan or not tanggal_lahir or gender not in ("P", "W"):
                 continue
             prev_changes = conn.total_changes
             conn.execute(
-                """INSERT OR IGNORE INTO records (uid, username, nama, email, tanggal_lahir, gender, password, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, 'antrian')""",
-                (uid, username, nama, email, tanggal_lahir, gender, password),
+                """INSERT OR IGNORE INTO records (uid, username, nama_depan, nama_belakang, email, tanggal_lahir, gender, password, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'antrian')""",
+                (uid, username, nama_depan, nama_belakang, email, tanggal_lahir, gender, password),
             )
             if conn.total_changes > prev_changes:
                 count += 1
@@ -101,21 +139,22 @@ def render_table_page(username: str, rows, total: int, sel_status: str = "", sel
     if rows:
         for r in rows:
             row_html += f"""<tr>
-                    <td>{r['nama']}</td>
+                    <td>{r['nama_depan']}</td>
+                    <td>{r['nama_belakang']}</td>
                     <td>{r['email']}</td>
                     <td>{r['tanggal_lahir']}</td>
                     <td>{r['gender']}</td>
                     <td>{r['password']}</td>
                     <td><span class="badge badge-{r['status']}">{r['status']}</span></td>
                     <td>
-                        <button class="btn-edit" onclick="openEdit('{r['uid']}','{r['nama']}','{r['email']}','{r['tanggal_lahir']}','{r['gender']}','{r['password']}')" title="Edit">✏️</button>
+                        <button class="btn-edit" onclick="openEdit('{r['uid']}','{r['nama_depan']}','{r['nama_belakang']}','{r['email']}','{r['tanggal_lahir']}','{r['gender']}','{r['password']}')" title="Edit">✏️</button>
                         <a href="/{username}/status/sukses/{r['uid']}" style="color:#28a745;text-decoration:none;" title="Sukses">✅</a>
                         <a href="/{username}/status/gagal/{r['uid']}" style="color:#dc3545;text-decoration:none;margin-left:6px;" title="Gagal">❌</a>
                     </td>
                 </tr>"""
         table_section = f"""<table>
             <thead>
-                <tr><th>Nama</th><th>Email</th><th>Tanggal Lahir</th><th>Gender</th><th>Password</th><th>Status</th><th>Aksi</th></tr>
+                <tr><th>Nama Depan</th><th>Nama Belakang</th><th>Email</th><th>Tanggal Lahir</th><th>Gender</th><th>Password</th><th>Status</th><th>Aksi</th></tr>
             </thead>
             <tbody>{row_html}</tbody>
         </table>"""
@@ -217,8 +256,10 @@ def render_table_page(username: str, rows, total: int, sel_status: str = "", sel
             <h2>✏️ Edit Data</h2>
             <form id="editForm">
                 <input type="hidden" id="editUid" name="uid">
-                <label>Nama</label>
-                <input type="text" id="editNama" name="nama" required>
+                <label>Nama Depan</label>
+                <input type="text" id="editNamaDepan" name="nama_depan" required>
+                <label>Nama Belakang</label>
+                <input type="text" id="editNamaBelakang" name="nama_belakang">
                 <label>Email</label>
                 <input type="text" id="editEmail" name="email" required>
                 <label>Tanggal Lahir</label>
@@ -244,9 +285,10 @@ def render_table_page(username: str, rows, total: int, sel_status: str = "", sel
     <script>
         const username = "{username}";
 
-        function openEdit(uid, nama, email, tgl, gender, pass) {{
+        function openEdit(uid, nama_depan, nama_belakang, email, tgl, gender, pass) {{
             document.getElementById('editUid').value = uid;
-            document.getElementById('editNama').value = nama;
+            document.getElementById('editNamaDepan').value = nama_depan;
+            document.getElementById('editNamaBelakang').value = nama_belakang;
             document.getElementById('editEmail').value = email;
             document.getElementById('editTgl').value = tgl;
             document.getElementById('editGender').value = gender;
@@ -270,7 +312,8 @@ def render_table_page(username: str, rows, total: int, sel_status: str = "", sel
             e.preventDefault();
             const uid = document.getElementById('editUid').value;
             const body = {{
-                nama: document.getElementById('editNama').value,
+                nama_depan: document.getElementById('editNamaDepan').value,
+                nama_belakang: document.getElementById('editNamaBelakang').value,
                 email: document.getElementById('editEmail').value,
                 tanggal_lahir: document.getElementById('editTgl').value,
                 gender: document.getElementById('editGender').value,
@@ -362,7 +405,7 @@ def render_import_page(username: str, message: str = "", msg_type: str = "") -> 
     <div class="container">
         <a class="back" href="/{username}/">← Kembali ke tabel</a>
         <h1>📥 Import CSV</h1>
-        <p>Upload file CSV dengan kolom: <strong>nama, email, tanggal_lahir, gender, password</strong></p>
+        <p>Upload file CSV dengan kolom: <strong>nama_depan, nama_belakang, email, tanggal_lahir, gender, password</strong></p>
         <p><a href="/template" style="color:#4a90d9;">📄 Download Template CSV</a></p>
         {msg_html}
         <form method="post" enctype="multipart/form-data">
@@ -376,7 +419,8 @@ def render_import_page(username: str, message: str = "", msg_type: str = "") -> 
             <p>Gunakan prompt berikut di ChatGPT / Gemini / Copilot untuk membuat data CSV secara otomatis:</p>
             <pre id="aiPrompt">Buatkan file CSV dengan 100 data random menggunakan kolom berikut:
 
-- nama → nama lengkap Indonesia (nama depan + belakang)
+- nama_depan → nama depan Indonesia
+- nama_belakang → nama belakang Indonesia
 - email → kombinasi nama depan + nama belakang + angka random, semua pakai @gmail.com
 - tanggal_lahir → format YYYY-MM-DD, umur random antara 4 sampai 11 tahun
 - gender → P atau W
@@ -491,7 +535,9 @@ def get_one_antrian(username: str):
             "message": "data diambil dan status diubah menjadi sukses",
             "data": {
                 "uid": row["uid"],
-                "nama": row["nama"],
+                "nama_depan": row["nama_depan"],
+                "nama_belakang": row["nama_belakang"],
+                "nama": f"{row['nama_depan']} {row['nama_belakang']}".strip(),
                 "email": row["email"],
                 "tanggal_lahir": row["tanggal_lahir"],
                 "tanggal_lahir_d": tgl_d,
@@ -521,13 +567,14 @@ def edit_record(username: str, uid: str, body: dict):
             content={"message": "data tidak ditemukan"}, status_code=404
         )
 
-    nama = body.get("nama", "").strip()
+    nama_depan = body.get("nama_depan", "").strip()
+    nama_belakang = body.get("nama_belakang", "").strip()
     email_raw = body.get("email", "").strip()
     tanggal_lahir = body.get("tanggal_lahir", "").strip()
     gender = body.get("gender", "").strip().upper()
     password = body.get("password", "").strip()
 
-    if not nama or not email_raw or not tanggal_lahir or gender not in ("P", "W"):
+    if not nama_depan or not email_raw or not tanggal_lahir or gender not in ("P", "W"):
         conn.close()
         return JSONResponse(
             content={"message": "data tidak valid (semua field wajib diisi, gender P/W)"},
@@ -536,9 +583,9 @@ def edit_record(username: str, uid: str, body: dict):
 
     email = strip_email(email_raw)
     conn.execute(
-        """UPDATE records SET nama=?, email=?, tanggal_lahir=?, gender=?, password=?
+        """UPDATE records SET nama_depan=?, nama_belakang=?, email=?, tanggal_lahir=?, gender=?, password=?
            WHERE username=? AND uid=?""",
-        (nama, email, tanggal_lahir, gender, password, username, uid),
+        (nama_depan, nama_belakang, email, tanggal_lahir, gender, password, username, uid),
     )
     conn.commit()
     conn.close()
