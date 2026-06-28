@@ -2,16 +2,29 @@ import sqlite3
 import csv
 import io
 import uuid
+import os
+import json
 from pathlib import Path
 
-from fastapi import FastAPI, Request, UploadFile, File, Query
+from fastapi import FastAPI, Request, Query
 from fastapi.responses import HTMLResponse, JSONResponse
+from dotenv import load_dotenv
+from openai import OpenAI
 
 # ─── App Setup ───────────────────────────────────────────────────────────────
 
+BASE_DIR = Path(__file__).parent
+
+load_dotenv(BASE_DIR / ".env")
+
 app = FastAPI(title="Gema-IL Data Manager")
 
-BASE_DIR = Path(__file__).parent
+AI_URL = os.getenv("ai_url", "")
+AI_MODEL = os.getenv("ai_model", "")
+AI_KEY = os.getenv("ai_key", "")
+ai_client = None
+if AI_URL and AI_MODEL and AI_KEY:
+    ai_client = OpenAI(base_url=AI_URL, api_key=AI_KEY)
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "data.db"
@@ -212,7 +225,7 @@ def render_table_page(username: str, rows, total: int, sel_status: str = "", sel
     <div class="container">
         <h1>📋 Data User: {username}</h1>
         <div class="nav">
-            <a href="/{username}/import">📥 Import CSV</a>
+            <a href="/{username}/generate">🤖 Generate Data</a>
             <a href="/{username}/get">🎯 Ambil Antrian</a>
             <a href="/template" style="background:#6c757d;">📄 Download Template CSV</a>
             <button onclick="confirmClear()" style="padding:8px 16px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🗑️ Clear Data</button>
@@ -370,15 +383,15 @@ def render_table_page(username: str, rows, total: int, sel_status: str = "", sel
 </html>"""
 
 
-def render_import_page(username: str, message: str = "", msg_type: str = "") -> str:
-    """Render the CSV import form page."""
+def render_generate_page(username: str, message: str = "", msg_type: str = "") -> str:
+    """Render the AI Generate data page."""
     msg_html = f'<div class="msg msg-{msg_type}">{message}</div>' if message else ""
     return f"""<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Import CSV - {username}</title>
+    <title>Generate Data - {username}</title>
     <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{ font-family: system-ui, sans-serif; background: #f5f5f5; padding: 20px; }}
@@ -387,60 +400,134 @@ def render_import_page(username: str, message: str = "", msg_type: str = "") -> 
         p {{ color: #666; margin-bottom: 20px; font-size: 14px; }}
         .back {{ display: inline-block; margin-bottom: 20px; color: #4a90d9; text-decoration: none; font-size: 14px; }}
         label {{ display: block; font-weight: 600; margin-bottom: 8px; color: #333; }}
-        input[type="file"] {{ display: block; margin-bottom: 16px; }}
+        input[type="number"], input[type="password"] {{ width: 100%; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }}
         button {{ padding: 10px 24px; background: #4a90d9; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }}
         button:hover {{ background: #357abd; }}
-        .note {{ margin-top: 16px; padding: 12px; background: #fff3cd; border-radius: 6px; font-size: 13px; color: #856404; }}
         .msg {{ margin-bottom: 16px; padding: 10px; border-radius: 6px; font-size: 14px; }}
         .msg-ok {{ background: #d4edda; color: #155724; }}
         .msg-err {{ background: #f8d7da; color: #721c24; }}
-        .prompt-box {{ margin-top: 20px; padding: 16px; background: #f0f4ff; border: 1px solid #c5d3f0; border-radius: 8px; font-size: 13px; color: #2c3e6b; }}
-        .prompt-box h3 {{ margin-bottom: 10px; font-size: 14px; color: #1a2a5e; }}
-        .prompt-box pre {{ background: #e8edf8; border-radius: 6px; padding: 12px; white-space: pre-wrap; word-break: break-word; font-family: monospace; font-size: 12px; line-height: 1.6; color: #1a1a2e; margin-top: 8px; }}
-        .copy-btn {{ margin-top: 10px; padding: 6px 14px; background: #4a90d9; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }}
-        .copy-btn:hover {{ background: #357abd; }}
+        .msg-info {{ background: #cce5ff; color: #004085; }}
+        .loading {{ display: none; text-align: center; margin: 20px 0; }}
+        .loading.active {{ display: block; }}
+        .spinner {{ border: 4px solid #f3f3f3; border-top: 4px solid #4a90d9; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+
+        /* Modal Styles */
+        .modal-overlay {{ display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }}
+        .modal-overlay.active {{ display: flex; }}
+        .modal-box {{ background: #fff; padding: 30px; border-radius: 12px; max-width: 420px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center; }}
+        .modal-box h2 {{ margin-bottom: 12px; color: #333; font-size: 20px; }}
+        .modal-box p {{ color: #666; margin-bottom: 20px; font-size: 14px; }}
+        .modal-box label {{ text-align: left; display: block; font-weight: 600; margin-bottom: 6px; color: #333; font-size: 13px; }}
+        .modal-box input {{ width: 100%; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 14px; }}
+        .modal-actions {{ display: flex; gap: 10px; justify-content: center; }}
+        .btn-generate {{ background: #28a745; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }}
+        .btn-generate:hover {{ background: #218838; }}
+        .btn-cancel {{ background: #6c757d; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }}
+        .btn-cancel:hover {{ background: #5a6268; }}
+        .btn-generate:disabled {{ background: #88c999; cursor: not-allowed; }}
     </style>
 </head>
 <body>
     <div class="container">
         <a class="back" href="/{username}/">← Kembali ke tabel</a>
-        <h1>📥 Import CSV</h1>
-        <p>Upload file CSV dengan kolom: <strong>nama_depan, nama_belakang, email, tanggal_lahir, gender, password</strong></p>
-        <p><a href="/template" style="color:#4a90d9;">📄 Download Template CSV</a></p>
+        <h1>🤖 Generate Data dengan AI</h1>
+        <p>Generate data random menggunakan AI langsung ke database.</p>
         {msg_html}
-        <form method="post" enctype="multipart/form-data">
-            <label for="file">Pilih file CSV:</label>
-            <input type="file" id="file" name="file" accept=".csv" required>
-            <button type="submit">Upload & Import</button>
-        </form>
 
-        <div class="prompt-box">
-            <h3>🤖 Prompt AI untuk Generate 100 Data CSV</h3>
-            <p>Gunakan prompt berikut di ChatGPT / Gemini / Copilot untuk membuat data CSV secara otomatis:</p>
-            <pre id="aiPrompt">Buatkan file CSV dengan 100 data random menggunakan kolom berikut:
+        <button onclick="openGenerateModal()" style="background:#28a745;padding:12px 28px;font-size:15px;">🤖 Generate Data</button>
 
-- nama_depan → nama depan Indonesia
-- nama_belakang → nama belakang Indonesia
-- email → kombinasi nama depan + 1 angka random + nama belakang + angka random, semua pakai @gmail.com
-- tanggal_lahir → format YYYY-MM-DD, umur random antara 4 sampai 11 tahun
-- gender → P atau W
-- password → semua disamakan dengan nilai GANTIPASSWORD
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="color:#666;">AI sedang membuat data... mohon tunggu.</p>
+        </div>
+    </div>
 
-Simpan sebagai file CSV dan tampilkan 5 baris pertama sebagai preview.</pre>
-            <button class="copy-btn" onclick="copyPrompt()">📋 Salin Prompt</button>
+    <!-- Generate Modal -->
+    <div class="modal-overlay" id="generateModal">
+        <div class="modal-box">
+            <h2>🤖 Generate Data</h2>
+            <p>Masukkan jumlah data yang ingin dibuat (max 100).</p>
+            <label for="genCount">Jumlah Data:</label>
+            <input type="number" id="genCount" min="1" max="100" value="10" placeholder="1-100">
+            <label for="genPassword">Password:</label>
+            <input type="text" id="genPassword" placeholder="Masukkan password">
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeGenerateModal()">Batal</button>
+                <button class="btn-generate" id="btnGenerate" onclick="doGenerate()">🤖 Generate</button>
+            </div>
         </div>
     </div>
 
     <script>
-        function copyPrompt() {{
-            const text = document.getElementById('aiPrompt').innerText;
-            navigator.clipboard.writeText(text).then(function() {{
-                const btn = document.querySelector('.copy-btn');
-                btn.textContent = '✅ Tersalin!';
-                setTimeout(function() {{ btn.textContent = '📋 Salin Prompt'; }}, 2000);
-            }}).catch(function() {{
-                alert('Gagal menyalin. Silakan salin manual.');
-            }});
+        function openGenerateModal() {{
+            document.getElementById('generateModal').classList.add('active');
+            document.getElementById('genCount').value = 10;
+            document.getElementById('genPassword').value = '';
+        }}
+
+        function closeGenerateModal() {{
+            document.getElementById('generateModal').classList.remove('active');
+        }}
+
+        document.getElementById('generateModal').addEventListener('click', function(e) {{
+            if (e.target === this) closeGenerateModal();
+        }});
+
+        async function doGenerate() {{
+            const count = parseInt(document.getElementById('genCount').value);
+            const password = document.getElementById('genPassword').value.trim();
+
+            if (!count || count < 1 || count > 100) {{
+                alert('Jumlah data harus antara 1 - 100.');
+                return;
+            }}
+
+            if (!password) {{
+                alert('Password wajib diisi.');
+                return;
+            }}
+
+            closeGenerateModal();
+            document.getElementById('loading').classList.add('active');
+            const btn = document.querySelector('.container > button');
+            btn.disabled = true;
+
+            try {{
+                const resp = await fetch('/{username}/generate', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ count: count, password: password }})
+                }});
+                const data = await resp.json();
+
+                if (resp.ok) {{
+                    const msgDiv = document.querySelector('.msg');
+                    if (msgDiv) msgDiv.remove();
+                    const newMsg = document.createElement('div');
+                    newMsg.className = 'msg msg-ok';
+                    newMsg.textContent = '✅ ' + data.message;
+                    document.querySelector('.container').insertBefore(newMsg, document.querySelector('.container > button'));
+                    setTimeout(function() {{ location.href = '/{username}/'; }}, 2000);
+                }} else {{
+                    const msgDiv = document.querySelector('.msg');
+                    if (msgDiv) msgDiv.remove();
+                    const newMsg = document.createElement('div');
+                    newMsg.className = 'msg msg-err';
+                    newMsg.textContent = '❌ ' + (data.message || 'Gagal generate');
+                    document.querySelector('.container').insertBefore(newMsg, document.querySelector('.container > button'));
+                }}
+            }} catch(err) {{
+                const msgDiv = document.querySelector('.msg');
+                if (msgDiv) msgDiv.remove();
+                const newMsg = document.createElement('div');
+                newMsg.className = 'msg msg-err';
+                newMsg.textContent = '❌ Gagal terhubung ke server atau AI.';
+                document.querySelector('.container').insertBefore(newMsg, document.querySelector('.container > button'));
+            }} finally {{
+                document.getElementById('loading').classList.remove('active');
+                btn.disabled = false;
+            }}
         }}
     </script>
 </body>
@@ -654,40 +741,103 @@ def update_status_gagal(username: str, uid: str):
     )
 
 
-@app.get("/{username}/import", response_class=HTMLResponse)
-def import_page(request: Request, username: str):
-    """Tampilkan halaman form upload CSV."""
-    return HTMLResponse(content=render_import_page(username))
+@app.get("/{username}/generate", response_class=HTMLResponse)
+def generate_page(request: Request, username: str):
+    """Tampilkan halaman generate data dengan AI."""
+    return HTMLResponse(content=render_generate_page(username))
 
 
-@app.post("/{username}/import", response_class=HTMLResponse)
-async def import_csv(request: Request, username: str, file: UploadFile = File(...)):
-    """Proses upload CSV dan insert ke database."""
-    message = ""
-    msg_type = "err"
+@app.post("/{username}/generate")
+async def generate_data(request: Request, username: str):
+    """Generate data via AI — expects JSON body: {count, password}."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"message": "Invalid JSON body"}, status_code=400)
 
-    if not file.filename or not file.filename.lower().endswith(".csv"):
-        message = "❌ File harus berformat CSV."
+    count = body.get("count", 10)
+    password = body.get("password", "").strip()
+
+    if not isinstance(count, int) or count < 1 or count > 100:
+        return JSONResponse(content={"message": "Jumlah data harus antara 1 - 100."}, status_code=400)
+
+    if not password:
+        return JSONResponse(content={"message": "Password wajib diisi."}, status_code=400)
+
+    if ai_client is None:
+        return JSONResponse(content={"message": "AI belum dikonfigurasi. Cek .env (ai_url, ai_model)."}, status_code=500)
+
+    prompt = f"""Kamu adalah generator data CSV. Buatkan data CSV dengan {count} data random menggunakan kolom berikut:
+
+- nama_depan → nama depan Indonesia (random, bervariasi)
+- nama_belakang → nama belakang Indonesia (random, bervariasi)
+- email → kombinasi nama_depan + 1 angka random + nama_belakang + angka random, semua pakai @gmail.com, lowercase
+- tanggal_lahir → format YYYY-MM-DD, umur random antara 4 sampai 11 tahun
+- gender → P atau W (random)
+- password → semuanya disamakan "{password}"
+
+**PENTING**: Hanya tampilkan data CSV-nya saja, tanpa header kolom, tanpa pembuka seperti "berikut datanya", cukup data mentahnya saja.
+Format: nama_depan,nama_belakang,email,tanggal_lahir,gender,password
+satu baris per data."""
+
+    try:
+        response = ai_client.chat.completions.create(
+            model=AI_MODEL,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.9,
+            max_tokens=4000,
+        )
+        csv_text = response.choices[0].message.content.strip()
+    except Exception as e:
+        return JSONResponse(content={"message": f"AI error: {str(e)}"}, status_code=500)
+
+    # Remove potential markdown code fences
+    csv_text = csv_text.strip()
+    if csv_text.startswith("```"):
+        lines = csv_text.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        csv_text = "\n".join(lines)
+
+    # Check if first line is a header (contains known column names)
+    first_line = csv_text.split("\n")[0].strip().lower() if csv_text else ""
+    has_header = any(col in first_line for col in ["nama_depan", "email", "tanggal_lahir"])
+
+    if has_header:
+        # Parse with AI-provided header, but map to canonical names
+        reader = csv.DictReader(io.StringIO(csv_text))
+        raw_rows = list(reader)
+        # Normalize column names to lowercase
+        rows = []
+        for r in raw_rows:
+            normalized = {}
+            for k, v in r.items():
+                if v is not None:
+                    normalized[k.strip().lower()] = v.strip()
+            # Map to expected fields
+            mapped = {}
+            for field in ["nama_depan", "nama_belakang", "email", "tanggal_lahir", "gender", "password"]:
+                mapped[field] = normalized.get(field, "")
+            rows.append(mapped)
     else:
-        try:
-            content = await file.read()
-            text = content.decode("utf-8-sig")
-            reader = csv.DictReader(io.StringIO(text))
+        # AI returned data without header — prepend our own
+        header = "nama_depan,nama_belakang,email,tanggal_lahir,gender,password"
+        reader = csv.DictReader(io.StringIO(header + "\n" + csv_text))
+        rows = list(reader)
 
-            if not reader.fieldnames:
-                message = "❌ CSV kosong atau header tidak valid."
-            else:
-                rows = list(reader)
-                count = insert_records(username, rows)
-                if count > 0:
-                    message = f"✅ Berhasil mengimport {count} data ke user '{username}'."
-                    msg_type = "ok"
-                else:
-                    message = "⚠️ Tidak ada data valid yang diimport. Periksa format CSV."
-        except Exception as e:
-            message = f"❌ Gagal memproses file: {str(e)}"
+    if not rows:
+        return JSONResponse(content={"message": "AI tidak menghasilkan data yang valid. Coba lagi."}, status_code=500)
 
-    return HTMLResponse(content=render_import_page(username, message, msg_type))
+    inserted = insert_records(username, rows)
+    return JSONResponse(content={
+        "message": f"Berhasil generate & insert {inserted} dari {count} data.",
+        "inserted": inserted,
+        "requested": count,
+    })
 
 
 # ─── Root ─────────────────────────────────────────────────────────────────────
