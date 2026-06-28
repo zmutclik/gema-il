@@ -101,26 +101,35 @@ def split_name(nama: str) -> tuple:
     else:
         return (parts[0], parts[1])
 
-def insert_records(username: str, rows: list[dict]) -> int:
-    """Insert multiple records into DB. Returns count of inserted rows."""
+def insert_records(username: str, rows: list[dict]) -> tuple[int, list]:
+    """Insert multiple records into DB. Returns (count, skipped_reasons)."""
     conn = get_db()
     count = 0
-    for r in rows:
+    skipped = []
+    for i, r in enumerate(rows):
         try:
             uid = str(uuid.uuid4())
             email = strip_email(r.get("email", ""))
             if not email:
+                skipped.append(f"row {i}: email kosong → {r}")
                 continue
             # Support both 'nama' (full name) and 'nama_depan'+'nama_belakang' columns
             if "nama_depan" in r and "nama_belakang" in r:
-                nama_depan = r.get("nama_depan", "").strip()
-                nama_belakang = r.get("nama_belakang", "").strip()
+                nama_depan = (r.get("nama_depan") or "").strip()
+                nama_belakang = (r.get("nama_belakang") or "").strip()
             else:
                 nama_depan, nama_belakang = split_name(r.get("nama", ""))
-            tanggal_lahir = r.get("tanggal_lahir", "").strip()
-            gender = r.get("gender", "").strip().upper()
-            password = r.get("password", "").strip()
-            if not nama_depan or not tanggal_lahir or gender not in ("P", "W"):
+            tanggal_lahir = (r.get("tanggal_lahir") or "").strip()
+            gender = (r.get("gender") or "").strip().upper()
+            password = (r.get("password") or "").strip()
+            if not nama_depan:
+                skipped.append(f"row {i}: nama_depan kosong → {r}")
+                continue
+            if not tanggal_lahir:
+                skipped.append(f"row {i}: tanggal_lahir kosong → {r}")
+                continue
+            if gender not in ("P", "W"):
+                skipped.append(f"row {i}: gender invalid '{gender}' → {r}")
                 continue
             prev_changes = conn.total_changes
             conn.execute(
@@ -131,11 +140,12 @@ def insert_records(username: str, rows: list[dict]) -> int:
             if conn.total_changes > prev_changes:
                 count += 1
                 prev_changes = conn.total_changes
-        except (ValueError, KeyError):
+        except (ValueError, KeyError) as e:
+            skipped.append(f"row {i}: exception {e} → {r}")
             continue
     conn.commit()
     conn.close()
-    return count
+    return count, skipped
 
 
 # ─── HTML Templates (pure Python string formatting) ─────────────────────────
@@ -227,7 +237,6 @@ def render_table_page(username: str, rows, total: int, sel_status: str = "", sel
         <div class="nav">
             <a href="/{username}/generate">🤖 Generate Data</a>
             <a href="/{username}/get">🎯 Ambil Antrian</a>
-            <a href="/template" style="background:#6c757d;">📄 Download Template CSV</a>
             <button onclick="confirmClear()" style="padding:8px 16px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🗑️ Clear Data</button>
         </div>
         <form class="filters" method="get">
@@ -793,51 +802,69 @@ satu baris per data."""
     except Exception as e:
         return JSONResponse(content={"message": f"AI error: {str(e)}"}, status_code=500)
 
-    # Remove potential markdown code fences
-    csv_text = csv_text.strip()
-    if csv_text.startswith("```"):
-        lines = csv_text.split("\n")
-        if lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        csv_text = "\n".join(lines)
+    # Log raw AI response for debugging
+    print(f"[DEBUG] Raw AI response ({len(csv_text)} chars):")
+    print(csv_text[:1000])
+    print("---END RAW---")
 
-    # Check if first line is a header (contains known column names)
-    first_line = csv_text.split("\n")[0].strip().lower() if csv_text else ""
-    has_header = any(col in first_line for col in ["nama_depan", "email", "tanggal_lahir"])
+    # Remove potential markdown code fences (more robust)
+    csv_text = csv_text.strip()
+    # Remove ```csv or ``` fences
+    lines = csv_text.split("\n")
+    # Remove leading fence line(s) that are only ``` or ```csv etc.
+    while lines and lines[0].strip().startswith("```"):
+        lines.pop(0)
+    # Remove trailing fence line
+    while lines and lines[-1].strip() == "```":
+        lines.pop()
+    # Also remove empty leading/trailing lines
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    while lines and not lines[-1].strip():
+        lines.pop()
+    csv_text = "\n".join(lines)
+
+    # Robust header detection: check exact column names, not substring match
+    EXPECTED_HEADER = "nama_depan,nama_belakang,email,tanggal_lahir,gender,password"
+    EXPECTED_COLS = ["nama_depan", "nama_belakang", "email", "tanggal_lahir", "gender", "password"]
+
+    first_line = csv_text.split("\n")[0].strip() if csv_text else ""
+    first_cols = [c.strip().lower() for c in first_line.split(",")]
+
+    # Header detection: ALL expected columns must appear in first row (exact match)
+    has_header = all(col in first_cols for col in EXPECTED_COLS) and len(first_cols) >= len(EXPECTED_COLS)
 
     if has_header:
         # Parse with AI-provided header, but map to canonical names
         reader = csv.DictReader(io.StringIO(csv_text))
         raw_rows = list(reader)
-        # Normalize column names to lowercase
         rows = []
         for r in raw_rows:
             normalized = {}
             for k, v in r.items():
                 if v is not None:
                     normalized[k.strip().lower()] = v.strip()
-            # Map to expected fields
-            mapped = {}
-            for field in ["nama_depan", "nama_belakang", "email", "tanggal_lahir", "gender", "password"]:
-                mapped[field] = normalized.get(field, "")
+            mapped = {field: normalized.get(field, "") for field in EXPECTED_COLS}
             rows.append(mapped)
     else:
         # AI returned data without header — prepend our own
-        header = "nama_depan,nama_belakang,email,tanggal_lahir,gender,password"
-        reader = csv.DictReader(io.StringIO(header + "\n" + csv_text))
-        rows = list(reader)
+        reader = csv.DictReader(io.StringIO(EXPECTED_HEADER + "\n" + csv_text))
+        raw_rows = list(reader)
+        rows = raw_rows
 
-    if not rows:
-        return JSONResponse(content={"message": "AI tidak menghasilkan data yang valid. Coba lagi."}, status_code=500)
+    if not rows or len(rows) == 0:
+        return JSONResponse(content={"message": f"AI tidak menghasilkan data yang valid ({len(raw_rows) if 'raw_rows' in dir() else 0} baris).\nRaw AI output:\n{csv_text[:500]}", "raw_preview": csv_text[:500]}, status_code=500)
 
-    inserted = insert_records(username, rows)
-    return JSONResponse(content={
+    inserted, skipped = insert_records(username, rows)
+    response_data = {
         "message": f"Berhasil generate & insert {inserted} dari {count} data.",
         "inserted": inserted,
         "requested": count,
-    })
+    }
+    if skipped:
+        response_data["skipped"] = skipped[:5]  # max 5 reasons to avoid huge response
+        response_data["message"] += f" {len(skipped)} di-skip (cek 'skipped' field)."
+    return JSONResponse(content=response_data)
 
 
 # ─── Root ─────────────────────────────────────────────────────────────────────
