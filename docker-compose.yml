@@ -6,6 +6,7 @@ services:
     ports:
       - "8031:8031"
     volumes:
+      - .:/app
       - ./data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
