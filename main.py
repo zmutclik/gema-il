@@ -421,7 +421,7 @@ def render_import_page(username: str, message: str = "", msg_type: str = "") -> 
 
 - nama_depan → nama depan Indonesia
 - nama_belakang → nama belakang Indonesia
-- email → kombinasi nama depan + nama belakang + angka random, semua pakai @gmail.com
+- email → kombinasi nama depan + 1 angka random + nama belakang + angka random, semua pakai @gmail.com
 - tanggal_lahir → format YYYY-MM-DD, umur random antara 4 sampai 11 tahun
 - gender → P atau W
 - password → semua disamakan dengan nilai GANTIPASSWORD
