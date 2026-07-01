@@ -461,6 +461,8 @@ def render_generate_page(username: str, message: str = "", msg_type: str = "") -
             <input type="number" id="genCount" min="1" max="100" value="10" placeholder="1-100">
             <label for="genPassword">Password:</label>
             <input type="text" id="genPassword" placeholder="Masukkan password">
+            <label for="genPrefix">Prefix Email (opsional):</label>
+            <input type="text" id="genPrefix" placeholder="Contoh: user → user123@gmail.com">
             <div class="modal-actions">
                 <button class="btn-cancel" onclick="closeGenerateModal()">Batal</button>
                 <button class="btn-generate" id="btnGenerate" onclick="doGenerate()">🤖 Generate</button>
@@ -473,6 +475,7 @@ def render_generate_page(username: str, message: str = "", msg_type: str = "") -
             document.getElementById('generateModal').classList.add('active');
             document.getElementById('genCount').value = 10;
             document.getElementById('genPassword').value = '';
+            document.getElementById('genPrefix').value = '';
         }}
 
         function closeGenerateModal() {{
@@ -486,6 +489,7 @@ def render_generate_page(username: str, message: str = "", msg_type: str = "") -
         async function doGenerate() {{
             const count = parseInt(document.getElementById('genCount').value);
             const password = document.getElementById('genPassword').value.trim();
+            const prefix = document.getElementById('genPrefix').value.trim();
 
             if (!count || count < 1 || count > 100) {{
                 alert('Jumlah data harus antara 1 - 100.');
@@ -506,7 +510,7 @@ def render_generate_page(username: str, message: str = "", msg_type: str = "") -
                 const resp = await fetch('/{username}/generate', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ count: count, password: password }})
+                    body: JSON.stringify({{ count: count, password: password, prefix: prefix }})
                 }});
                 const data = await resp.json();
 
@@ -766,6 +770,7 @@ async def generate_data(request: Request, username: str):
 
     count = body.get("count", 10)
     password = body.get("password", "").strip()
+    prefix = body.get("prefix", "").strip()
 
     if not isinstance(count, int) or count < 1 or count > 100:
         return JSONResponse(content={"message": "Jumlah data harus antara 1 - 100."}, status_code=400)
@@ -776,11 +781,16 @@ async def generate_data(request: Request, username: str):
     if ai_client is None:
         return JSONResponse(content={"message": "AI belum dikonfigurasi. Cek .env (ai_url, ai_model)."}, status_code=500)
 
+    if prefix:
+        email_rule = f"email → '{prefix}' + nama_depan + 1 angka random + sedikit nama_belakang + angka random 2 sampai 4 digit + '@gmail.com'. Contoh: {prefix}budi2san23@gmail.com atau {prefix}sari1pur891@gmail.com."
+    else:
+        email_rule = "email → kombinasi nama_depan + 1 angka random + nama_belakang + 4 angka random sampai 5 angka random, semua pakai @gmail.com, lowercase"
+
     prompt = f"""Kamu adalah generator data CSV. Buatkan data CSV dengan {count} data random menggunakan kolom berikut:
 
 - nama_depan → nama depan Indonesia (random, bervariasi)
 - nama_belakang → nama belakang Indonesia (random, bervariasi)
-- email → kombinasi nama_depan + 1 angka random + nama_belakang + 4 angka random sampai 5 angka random, semua pakai @gmail.com, lowercase
+- {email_rule}
 - tanggal_lahir → format YYYY-MM-DD, umur random antara 4 sampai 11 tahun
 - gender → P atau W (random)
 - password → semuanya disamakan "{password}"
@@ -789,6 +799,9 @@ async def generate_data(request: Request, username: str):
 Format: nama_depan,nama_belakang,email,tanggal_lahir,gender,password
 satu baris per data."""
 
+    print(f"[DEBUG] Prompt to AI ({len(prompt)} chars):")
+    print(prompt[:1000])
+    
     try:
         response = ai_client.chat.completions.create(
             model=AI_MODEL,
