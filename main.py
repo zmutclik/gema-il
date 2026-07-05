@@ -230,6 +230,19 @@ def get_one_antrian(username: str, uid: str):
         conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
         conn.commit()
         conn.close()
+    if uid in ("entry", "verivikasi", "sukses", "gagal"):
+        """Ambil 1 data by status, ubah status jadi 'entry'."""
+        conn = get_db()
+        row = conn.execute(
+            "SELECT * FROM records WHERE username = ? AND status = ? ORDER BY uid ASC LIMIT 1",
+            (username, uid),
+        ).fetchone()
+
+        if not row:
+            conn.close()
+            return JSONResponse(
+                content={"message": f"tidak ada data dengan status '{uid}'", "data": None}, status_code=404
+            )
     else:
         """Ambil 1 data by uid, ubah status jadi 'entry'."""
         conn = get_db()

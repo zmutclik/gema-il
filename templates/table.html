@@ -52,7 +52,7 @@
         <h1>📋 Data User: {{ username }}</h1>
         <div class="nav">
             <a href="/{{ username }}/generate">🤖 Generate Data</a>
-            <a href="/{{ username }}/get">🎯 Ambil Antrian</a>
+            <a href="/{{ username }}/get/new">🎯 Ambil Antrian</a>
             <button onclick="confirmClear()" style="padding:8px 16px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🗑️ Clear Data</button>
         </div>
         <form class="filters" method="get">
@@ -60,6 +60,8 @@
             <select name="status">
                 <option value="">Semua</option>
                 <option value="antrian" {% if sel_status == 'antrian' %}selected{% endif %}>Antrian</option>
+                <option value="entry" {% if sel_status == 'entry' %}selected{% endif %}>Entry</option>
+                <option value="verivikasi" {% if sel_status == 'verivikasi' %}selected{% endif %}>Verivikasi</option>
                 <option value="sukses" {% if sel_status == 'sukses' %}selected{% endif %}>Sukses</option>
                 <option value="gagal" {% if sel_status == 'gagal' %}selected{% endif %}>Gagal</option>
             </select>
