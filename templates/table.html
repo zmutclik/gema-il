@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data {{ username }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        h1 { color: #333; margin-bottom: 20px; }
+        .nav { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .nav a { padding: 8px 16px; background: #4a90d9; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; }
+        .nav a:hover { background: #357abd; }
+        .filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .filters select, .filters button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        .filters button { background: #28a745; color: #fff; border: none; cursor: pointer; }
+        .filters button:hover { background: #218838; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #4a90d9; color: #fff; font-weight: 600; }
+        tr:hover { background: #f1f7ff; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-antrian { background: #b7b7b7; color: #ffffff; }
+        .badge-entry { background: #cce5ff; color: #004085; }
+        .badge-verivikasi { background: #ffeeba; color: #856404; }
+        .badge-sukses { background: #d4edda; color: #155724; }
+        .badge-gagal { background: #f8d7da; color: #721c24; }
+        .empty { text-align: center; color: #888; padding: 40px; }
+        .count { color: #666; margin-bottom: 10px; font-size: 14px; }
+        .btn-edit { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+        .btn-edit:hover { background: #e8e8e8; border-radius: 4px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #fff; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .modal-content h2 { margin-bottom: 20px; color: #333; }
+        .modal-content label { display: block; font-weight: 600; margin-bottom: 4px; margin-top: 12px; color: #333; font-size: 13px; }
+        .modal-content input, .modal-content select { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+        .modal-actions button { padding: 8px 20px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
+        .btn-save { background: #28a745; color: #fff; }
+        .btn-save:hover { background: #218838; }
+        .btn-cancel { background: #6c757d; color: #fff; }
+        .btn-cancel:hover { background: #5a6268; }
+        .toast { display: none; position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 14px; z-index: 2000; }
+        .toast-ok { background: #28a745; }
+        .toast-err { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Data User: {{ username }}</h1>
+        <div class="nav">
+            <a href="/{{ username }}/generate">🤖 Generate Data</a>
+            <a href="/{{ username }}/get">🎯 Ambil Antrian</a>
+            <button onclick="confirmClear()" style="padding:8px 16px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🗑️ Clear Data</button>
+        </div>
+        <form class="filters" method="get">
+            <label>Status:</label>
+            <select name="status">
+                <option value="">Semua</option>
+                <option value="antrian" {% if sel_status == 'antrian' %}selected{% endif %}>Antrian</option>
+                <option value="sukses" {% if sel_status == 'sukses' %}selected{% endif %}>Sukses</option>
+                <option value="gagal" {% if sel_status == 'gagal' %}selected{% endif %}>Gagal</option>
+            </select>
+            <label>Gender:</label>
+            <select name="gender">
+                <option value="">Semua</option>
+                <option value="P" {% if sel_gender == 'P' %}selected{% endif %}>Pria</option>
+                <option value="W" {% if sel_gender == 'W' %}selected{% endif %}>Wanita</option>
+            </select>
+            <button type="submit">🔍 Filter</button>
+            <a href="/{{ username }}/" style="padding:8px 12px;color:#dc3545;text-decoration:none;">Reset</a>
+        </form>
+        <p class="count">Total: {{ total }} data</p>
+
+        {% if rows %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Nama Depan</th>
+                    <th>Nama Belakang</th>
+                    <th>Email</th>
+                    <th>Tanggal Lahir</th>
+                    <th>Gender</th>
+                    <th>Password</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td>{{ r.nama_depan }}</td>
+                    <td>{{ r.nama_belakang }}</td>
+                    <td>{{ r.email }}</td>
+                    <td>{{ r.tanggal_lahir }}</td>
+                    <td>{{ r.gender }}</td>
+                    <td>{{ r.password }}</td>
+                    <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
+                    <td>
+                        <button class="btn-edit"
+                            onclick="openEdit(
+                                '{{ r.uid | e }}',
+                                '{{ r.nama_depan | e }}',
+                                '{{ r.nama_belakang | e }}',
+                                '{{ r.email | e }}',
+                                '{{ r.tanggal_lahir | e }}',
+                                '{{ r.gender | e }}',
+                                '{{ r.password | e }}',
+                                '{{ r.status | e }}'
+                            )" title="Edit">✏️</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty">🚫 Tidak ada data.</p>
+        {% endif %}
+    </div>
+
+    <!-- Confirm Clear Modal -->
+    <div class="modal" id="clearModal">
+        <div class="modal-content" style="max-width:400px;text-align:center;">
+            <h2 style="color:#dc3545;">🗑️ Clear Data</h2>
+            <p style="margin:16px 0;color:#555;">Hapus <strong>semua data</strong> milik user <strong>{{ username }}</strong>?<br>Tindakan ini tidak dapat dibatalkan.</p>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
+                <button class="btn-cancel" onclick="document.getElementById('clearModal').classList.remove('active')">Batal</button>
+                <button class="btn-save" style="background:#dc3545;" onclick="doClear()">Ya, Hapus Semua</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <h2>✏️ Edit Data</h2>
+            <form id="editForm">
+                <input type="hidden" id="editUid" name="uid">
+                <label>Nama Depan</label>
+                <input type="text" id="editNamaDepan" name="nama_depan" required>
+                <label>Nama Belakang</label>
+                <input type="text" id="editNamaBelakang" name="nama_belakang">
+                <label>Email</label>
+                <input type="text" id="editEmail" name="email" required>
+                <label>Tanggal Lahir</label>
+                <input type="text" id="editTgl" name="tanggal_lahir" placeholder="YYYY-MM-DD" required>
+                <label>Gender</label>
+                <select id="editGender" name="gender" required>
+                    <option value="P">Pria</option>
+                    <option value="W">Wanita</option>
+                </select>
+                <label>Password</label>
+                <input type="text" id="editPassword" name="password" required>
+                <label>Status</label>
+                <select id="editStatus" name="status" required>
+                    <option value="antrian">Antrian</option>
+                    <option value="entry">Entry</option>
+                    <option value="verivikasi">Verivikasi</option>
+                    <option value="sukses">Sukses</option>
+                    <option value="gagal">Gagal</option>
+                </select>
+                <div class="modal-actions">
+                    <button type="button" class="btn-cancel" onclick="closeEdit()">Batal</button>
+                    <button type="submit" class="btn-save">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const username = "{{ username }}";
+
+        function openEdit(uid, nama_depan, nama_belakang, email, tgl, gender, pass, status) {
+            document.getElementById('editUid').value = uid;
+            document.getElementById('editNamaDepan').value = nama_depan;
+            document.getElementById('editNamaBelakang').value = nama_belakang;
+            document.getElementById('editEmail').value = email;
+            document.getElementById('editTgl').value = tgl;
+            document.getElementById('editGender').value = gender;
+            document.getElementById('editPassword').value = pass;
+            document.getElementById('editStatus').value = status;
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function closeEdit() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        function showToast(msg, ok) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast ' + (ok ? 'toast-ok' : 'toast-err');
+            t.style.display = 'block';
+            setTimeout(function() { t.style.display = 'none'; }, 3000);
+        }
+
+        document.getElementById('editForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const uid = document.getElementById('editUid').value;
+            const body = {
+                nama_depan: document.getElementById('editNamaDepan').value,
+                nama_belakang: document.getElementById('editNamaBelakang').value,
+                email: document.getElementById('editEmail').value,
+                tanggal_lahir: document.getElementById('editTgl').value,
+                gender: document.getElementById('editGender').value,
+                password: document.getElementById('editPassword').value,
+                status: document.getElementById('editStatus').value,
+            };
+            try {
+                const resp = await fetch('/' + username + '/edit/' + uid, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    showToast('✅ Data berhasil diupdate!', true);
+                    closeEdit();
+                    setTimeout(() => location.reload(), 600);
+                } else {
+                    showToast('❌ ' + (data.message || 'Gagal update'), false);
+                }
+            } catch(err) {
+                showToast('❌ Gagal terhubung ke server', false);
+            }
+        });
+
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEdit();
+        });
+        document.getElementById('clearModal').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
+
+        function confirmClear() {
+            document.getElementById('clearModal').classList.add('active');
+        }
+
+        async function doClear() {
+            document.getElementById('clearModal').classList.remove('active');
+            try {
+                const resp = await fetch('/' + username + '/clear', { method: 'DELETE' });
+                const data = await resp.json();
+                if (resp.ok) {
+                    showToast('🗑️ ' + data.message, true);
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showToast('❌ ' + (data.message || 'Gagal menghapus'), false);
+                }
+            } catch(err) {
+                showToast('❌ Gagal terhubung ke server', false);
+            }
+        }
+    </script>
+</body>
+</html>
