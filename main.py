@@ -371,6 +371,25 @@ def clear_data(username: str):
         content={"message": f"{deleted} data berhasil dihapus", "deleted": deleted}
     )
 
+@app.delete("/{username}/delete/{uid}")
+def delete_record(username: str, uid: str):
+    """Hapus satu record berdasarkan uid."""
+    conn = get_db()
+    cursor = conn.execute(
+        "DELETE FROM records WHERE username = ? AND uid = ?", (username, uid)
+    )
+    conn.commit()
+    deleted = cursor.rowcount
+    conn.close()
+
+    if deleted == 0:
+        return JSONResponse(
+            content={"message": "data tidak ditemukan"}, status_code=404
+        )
+
+    return JSONResponse(
+        content={"message": "data berhasil dihapus", "deleted": True}
+    )
 
 @app.get("/{username}/status/{status}/{uid}")
 def update_status_sukses(username: str, uid: str, status: str):

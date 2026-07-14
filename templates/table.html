@@ -80,22 +80,20 @@
         <table>
             <thead>
                 <tr>
-                    <th>Nama Depan</th>
-                    <th>Nama Belakang</th>
+                    <th>Nama Lengkap</th>
                     <th>Email</th>
                     <th>Email Utama</th>
                     <th>Tanggal Lahir</th>
                     <th>Gender</th>
                     <th>Password</th>
                     <th>Status</th>
-                    <th>Aksi</th>
+                    <th style="width: 100px;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in rows %}
                 <tr>
-                    <td>{{ r.nama_depan }}</td>
-                    <td>{{ r.nama_belakang }}</td>
+                    <td>{{ r.nama_depan }} {{ r.nama_belakang }}</td>
                     <td>{{ r.email }}</td>
                     <td>{{ r.email_utama }}</td>
                     <td>{{ r.tanggal_lahir }}</td>
@@ -115,6 +113,9 @@
                                 '{{ r.password | e }}',
                                 '{{ r.status | e }}'
                             )" title="Edit">✏️</button>
+                        <button class="btn-edit"
+                            onclick="confirmDelete('{{ r.uid | e }}', '{{ r.nama_depan | e }} {{ r.nama_belakang | e }}')"
+                            title="Hapus" style="color:#dc3545;">🗑️</button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -123,6 +124,19 @@
         {% else %}
         <p class="empty">🚫 Tidak ada data.</p>
         {% endif %}
+    </div>
+
+    <!-- Confirm Delete Single Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content" style="max-width:400px;text-align:center;">
+            <h2 style="color:#dc3545;">🗑️ Hapus Data</h2>
+            <p style="margin:16px 0;color:#555;">Hapus data <strong id="deleteName"></strong>?<br>Tindakan ini tidak dapat dibatalkan.</p>
+            <input type="hidden" id="deleteUid">
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:20px;">
+                <button class="btn-cancel" onclick="document.getElementById('deleteModal').classList.remove('active')">Batal</button>
+                <button class="btn-save" style="background:#dc3545;" onclick="doDelete()">Ya, Hapus</button>
+            </div>
+        </div>
     </div>
 
     <!-- Confirm Clear Modal -->
@@ -245,6 +259,32 @@
         document.getElementById('clearModal').addEventListener('click', function(e) {
             if (e.target === this) this.classList.remove('active');
         });
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
+
+        function confirmDelete(uid, name) {
+            document.getElementById('deleteUid').value = uid;
+            document.getElementById('deleteName').textContent = name || uid;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        async function doDelete() {
+            const uid = document.getElementById('deleteUid').value;
+            document.getElementById('deleteModal').classList.remove('active');
+            try {
+                const resp = await fetch('/' + username + '/delete/' + uid, { method: 'DELETE' });
+                const data = await resp.json();
+                if (resp.ok) {
+                    showToast('🗑️ ' + data.message, true);
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    showToast('❌ ' + (data.message || 'Gagal menghapus'), false);
+                }
+            } catch(err) {
+                showToast('❌ Gagal terhubung ke server', false);
+            }
+        }
 
         function confirmClear() {
             document.getElementById('clearModal').classList.add('active');
