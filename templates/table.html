@@ -83,6 +83,7 @@
                     <th>Nama Depan</th>
                     <th>Nama Belakang</th>
                     <th>Email</th>
+                    <th>Email Utama</th>
                     <th>Tanggal Lahir</th>
                     <th>Gender</th>
                     <th>Password</th>
@@ -96,6 +97,7 @@
                     <td>{{ r.nama_depan }}</td>
                     <td>{{ r.nama_belakang }}</td>
                     <td>{{ r.email }}</td>
+                    <td>{{ r.email_utama }}</td>
                     <td>{{ r.tanggal_lahir }}</td>
                     <td>{{ r.gender }}</td>
                     <td>{{ r.password }}</td>
@@ -107,6 +109,7 @@
                                 '{{ r.nama_depan | e }}',
                                 '{{ r.nama_belakang | e }}',
                                 '{{ r.email | e }}',
+                                '{{ r.email_utama | e }}',
                                 '{{ r.tanggal_lahir | e }}',
                                 '{{ r.gender | e }}',
                                 '{{ r.password | e }}',
@@ -146,6 +149,8 @@
                 <input type="text" id="editNamaBelakang" name="nama_belakang">
                 <label>Email</label>
                 <input type="text" id="editEmail" name="email" required>
+                <label>Email Utama</label>
+                <input type="text" id="editEmailUtama" name="email_utama">
                 <label>Tanggal Lahir</label>
                 <input type="text" id="editTgl" name="tanggal_lahir" placeholder="YYYY-MM-DD" required>
                 <label>Gender</label>
@@ -177,11 +182,12 @@
     <script>
         const username = "{{ username }}";
 
-        function openEdit(uid, nama_depan, nama_belakang, email, tgl, gender, pass, status) {
+        function openEdit(uid, nama_depan, nama_belakang, email, email_utama, tgl, gender, pass, status) {
             document.getElementById('editUid').value = uid;
             document.getElementById('editNamaDepan').value = nama_depan;
             document.getElementById('editNamaBelakang').value = nama_belakang;
             document.getElementById('editEmail').value = email;
+            document.getElementById('editEmailUtama').value = email_utama;
             document.getElementById('editTgl').value = tgl;
             document.getElementById('editGender').value = gender;
             document.getElementById('editPassword').value = pass;
@@ -208,6 +214,7 @@
                 nama_depan: document.getElementById('editNamaDepan').value,
                 nama_belakang: document.getElementById('editNamaBelakang').value,
                 email: document.getElementById('editEmail').value,
+                email_utama: document.getElementById('editEmailUtama').value,
                 tanggal_lahir: document.getElementById('editTgl').value,
                 gender: document.getElementById('editGender').value,
                 password: document.getElementById('editPassword').value,

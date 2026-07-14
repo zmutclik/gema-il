@@ -50,6 +50,7 @@ def init_db():
             nama_depan TEXT NOT NULL,
             nama_belakang TEXT NOT NULL DEFAULT '',
             email TEXT NOT NULL,
+            email_utama TEXT NOT NULL DEFAULT '',
             tanggal_lahir TEXT NOT NULL,
             gender TEXT NOT NULL,
             password TEXT NOT NULL,
@@ -63,6 +64,10 @@ def init_db():
         pass
     try:
         conn.execute("ALTER TABLE records ADD COLUMN nama_belakang TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE records ADD COLUMN email_utama TEXT NOT NULL DEFAULT ''")
     except Exception:
         pass
     # Migrate existing nama → nama_depan + nama_belakang
@@ -134,10 +139,11 @@ def insert_records(username: str, rows: list[dict]) -> tuple[int, list]:
                 skipped.append(f"row {i}: gender invalid '{gender}' → {r}")
                 continue
             prev_changes = conn.total_changes
+            email_utama = (r.get("email_utama") or "").strip()
             conn.execute(
-                """INSERT OR IGNORE INTO records (uid, username, nama_depan, nama_belakang, email, tanggal_lahir, gender, password, status)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'antrian')""",
-                (uid, username, nama_depan, nama_belakang, email, tanggal_lahir, gender, password),
+                """INSERT OR IGNORE INTO records (uid, username, nama_depan, nama_belakang, email, email_utama, tanggal_lahir, gender, password, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'antrian')""",
+                (uid, username, nama_depan, nama_belakang, email, email_utama, tanggal_lahir, gender, password),
             )
             if conn.total_changes > prev_changes:
                 count += 1
@@ -213,9 +219,9 @@ def list_data(
 @app.get("/{username}/get/{uid}")
 def get_one_antrian(username: str, uid: str):
     status = "entry"
+    conn = get_db()
     if uid == "new":
-        """Ambil 1 data status 'antrian', langsung ubah jadi 'sukses'. Return JSON."""
-        conn = get_db()
+        """Ambil 1 data status 'antrian', ubah jadi 'entry'. Return JSON."""
         row = conn.execute(
             "SELECT * FROM records WHERE username = ? AND status = 'antrian' ORDER BY uid ASC LIMIT 1",
             (username,),
@@ -230,9 +236,8 @@ def get_one_antrian(username: str, uid: str):
         conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
         conn.commit()
         conn.close()
-    if uid in ("entry", "verivikasi", "sukses", "gagal"):
+    elif uid in ("entry", "verivikasi", "sukses", "gagal"):
         """Ambil 1 data by status, ubah status jadi 'entry'."""
-        conn = get_db()
         row = conn.execute(
             "SELECT * FROM records WHERE username = ? AND status = ? ORDER BY uid ASC LIMIT 1",
             (username, uid),
@@ -243,9 +248,11 @@ def get_one_antrian(username: str, uid: str):
             return JSONResponse(
                 content={"message": f"tidak ada data dengan status '{uid}'", "data": None}, status_code=404
             )
+        conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
+        conn.commit()
+        conn.close()
     else:
         """Ambil 1 data by uid, ubah status jadi 'entry'."""
-        conn = get_db()
         row = conn.execute(
             "SELECT * FROM records WHERE username = ? AND uid = ?", (username, uid)
         ).fetchone()
@@ -256,6 +263,9 @@ def get_one_antrian(username: str, uid: str):
                 content={"message": "data tidak ditemukan", "data": None}, status_code=404
             )
         status = row["status"]
+        conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
+        conn.commit()
+        conn.close()
 
     BULAN_ID = [
         "", "januari", "februari", "maret", "april", "mei", "juni",
@@ -282,6 +292,7 @@ def get_one_antrian(username: str, uid: str):
                 "nama_belakang": row["nama_belakang"],
                 "nama": f"{row['nama_depan']} {row['nama_belakang']}".strip(),
                 "email": row["email"],
+                "email_utama": row["email_utama"],
                 "tanggal_lahir": row["tanggal_lahir"],
                 "tanggal_lahir_d": tgl_d,
                 "tanggal_lahir_m": tgl_m,
@@ -313,6 +324,7 @@ def edit_record(username: str, uid: str, body: dict):
     nama_depan = body.get("nama_depan", "").strip()
     nama_belakang = body.get("nama_belakang", "").strip()
     email_raw = body.get("email", "").strip()
+    email_utama_raw = body.get("email_utama", "").strip()
     tanggal_lahir = body.get("tanggal_lahir", "").strip()
     gender = body.get("gender", "").strip().upper()
     password = body.get("password", "").strip()
@@ -333,10 +345,11 @@ def edit_record(username: str, uid: str, body: dict):
         )
 
     email = strip_email(email_raw)
+    email_utama = strip_email(email_utama_raw)
     conn.execute(
-        """UPDATE records SET nama_depan=?, nama_belakang=?, email=?, tanggal_lahir=?, gender=?, password=?, status=?
+        """UPDATE records SET nama_depan=?, nama_belakang=?, email=?, email_utama=?, tanggal_lahir=?, gender=?, password=?, status=?
            WHERE username=? AND uid=?""",
-        (nama_depan, nama_belakang, email, tanggal_lahir, gender, password, status, username, uid),
+        (nama_depan, nama_belakang, email, email_utama, tanggal_lahir, gender, password, status, username, uid),
     )
     conn.commit()
     conn.close()
@@ -404,6 +417,7 @@ async def generate_data(request: Request, username: str):
     count = body.get("count", 10)
     password = body.get("password", "").strip()
     prefix = body.get("prefix", "").strip()
+    email_utama_raw = body.get("email_utama", "").strip()
 
     if not isinstance(count, int) or count < 1 or count > 100:
         return JSONResponse(content={"message": "Jumlah data harus antara 1 - 100."}, status_code=400)
@@ -413,6 +427,19 @@ async def generate_data(request: Request, username: str):
 
     if ai_client is None:
         return JSONResponse(content={"message": "AI belum dikonfigurasi. Cek .env (ai_url, ai_model)."}, status_code=500)
+
+    # Parse email_utama domains
+    import random
+    email_domains = []
+    if email_utama_raw:
+        # Split by comma or newline
+        for part in email_utama_raw.replace("\n", ",").split(","):
+            domain = part.strip().lower()
+            if domain:
+                # Ensure domain has @ prefix for easy appending
+                if not domain.startswith("@"):
+                    domain = "@" + domain
+                email_domains.append(domain)
 
     if prefix:
         email_rule = f"email → '{prefix}' + nama_depan + 1 angka random + sedikit nama_belakang + angka random 2 sampai 4 digit + '@gmail.com'. Contoh: {prefix}budi2san23@gmail.com atau {prefix}sari1pur891@gmail.com."
@@ -449,9 +476,9 @@ satu baris per data."""
         return JSONResponse(content={"message": f"AI error: {str(e)}"}, status_code=500)
 
     # Log raw AI response for debugging
-    print(f"[DEBUG] Raw AI response ({len(csv_text)} chars):")
-    print(csv_text[:1000])
-    print("---END RAW---")
+    # print(f"[DEBUG] Raw AI response ({len(csv_text)} chars):")
+    # print(csv_text[:1000])
+    # print("---END RAW---")
 
     # Remove potential markdown code fences (more robust)
     csv_text = csv_text.strip()
@@ -500,6 +527,15 @@ satu baris per data."""
 
     if not rows or len(rows) == 0:
         return JSONResponse(content={"message": f"AI tidak menghasilkan data yang valid ({len(raw_rows) if 'raw_rows' in dir() else 0} baris).\nRaw AI output:\n{csv_text[:500]}", "raw_preview": csv_text[:500]}, status_code=500)
+
+    # Replace email domains with random email_utama domains if provided
+    if email_domains:
+        for r in rows:
+            email_local = r.get("email", "").split("@")[0]
+            if email_local:
+                r["email"] = email_local + random.choice(email_domains)
+            # Also store the chosen domain in email_utama for reference
+            r["email_utama"] = random.choice(email_domains).lstrip("@")
 
     inserted, skipped = insert_records(username, rows)
     response_data = {

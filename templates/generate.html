@@ -12,7 +12,7 @@
         p { color: #666; margin-bottom: 20px; font-size: 14px; }
         .back { display: inline-block; margin-bottom: 20px; color: #4a90d9; text-decoration: none; font-size: 14px; }
         label { display: block; font-weight: 600; margin-bottom: 8px; color: #333; }
-        input[type="number"], input[type="password"] { width: 100%; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 16px; }
+        input[type="number"], input[type="text"], textarea { width: 100%; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 16px; font-family: inherit; }
         button { padding: 10px 24px; background: #4a90d9; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
         button:hover { background: #357abd; }
         .msg { margin-bottom: 16px; padding: 10px; border-radius: 6px; font-size: 14px; }
@@ -24,20 +24,13 @@
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #4a90d9; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Modal Styles */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
-        .modal-overlay.active { display: flex; }
-        .modal-box { background: #fff; padding: 30px; border-radius: 12px; max-width: 420px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center; }
-        .modal-box h2 { margin-bottom: 12px; color: #333; font-size: 20px; }
-        .modal-box p { color: #666; margin-bottom: 20px; font-size: 14px; }
-        .modal-box label { text-align: left; display: block; font-weight: 600; margin-bottom: 6px; color: #333; font-size: 13px; }
-        .modal-box input { width: 100%; padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; margin-bottom: 14px; }
-        .modal-actions { display: flex; gap: 10px; justify-content: center; }
         .btn-generate { background: #28a745; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
         .btn-generate:hover { background: #218838; }
-        .btn-cancel { background: #6c757d; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
-        .btn-cancel:hover { background: #5a6268; }
         .btn-generate:disabled { background: #88c999; cursor: not-allowed; }
+        .form-section { margin-top: 20px; }
+        .form-section label { display: block; font-weight: 600; margin-bottom: 6px; color: #333; font-size: 14px; }
+        .form-section input, .form-section textarea { margin-bottom: 16px; }
+        .form-section button { margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -50,7 +43,17 @@
         <div class="msg msg-{{ msg_type }}">{{ message }}</div>
         {% endif %}
 
-        <button onclick="openGenerateModal()" style="background:#28a745;padding:12px 28px;font-size:15px;">🤖 Generate Data</button>
+        <div class="form-section">
+            <label for="genCount">Jumlah Data:</label>
+            <input type="number" id="genCount" min="1" max="100" value="10" placeholder="1-100">
+            <label for="genPassword">Password:</label>
+            <input type="text" id="genPassword" placeholder="Masukkan password">
+            <label for="genPrefix">Prefix Email (opsional):</label>
+            <input type="text" id="genPrefix" placeholder="Contoh: user → user123@gmail.com">
+            <label for="genEmailUtama">Email Utama (opsional):</label>
+            <textarea id="genEmailUtama" rows="3" placeholder="Contoh: gmail.com, yahoo.com, outlook.com&#10;Satu domain per baris atau dipisah koma."></textarea>
+            <button class="btn-generate" id="btnGenerate" onclick="doGenerate()" style="margin-top: 10px;">🤖 Generate</button>
+        </div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
@@ -58,46 +61,14 @@
         </div>
     </div>
 
-    <!-- Generate Modal -->
-    <div class="modal-overlay" id="generateModal">
-        <div class="modal-box">
-            <h2>🤖 Generate Data</h2>
-            <p>Masukkan jumlah data yang ingin dibuat (max 100).</p>
-            <label for="genCount">Jumlah Data:</label>
-            <input type="number" id="genCount" min="1" max="100" value="10" placeholder="1-100">
-            <label for="genPassword">Password:</label>
-            <input type="text" id="genPassword" placeholder="Masukkan password">
-            <label for="genPrefix">Prefix Email (opsional):</label>
-            <input type="text" id="genPrefix" placeholder="Contoh: user → user123@gmail.com">
-            <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeGenerateModal()">Batal</button>
-                <button class="btn-generate" id="btnGenerate" onclick="doGenerate()">🤖 Generate</button>
-            </div>
-        </div>
-    </div>
-
     <script>
         const username = "{{ username }}";
-
-        function openGenerateModal() {
-            document.getElementById('generateModal').classList.add('active');
-            document.getElementById('genCount').value = 10;
-            document.getElementById('genPassword').value = '';
-            document.getElementById('genPrefix').value = '';
-        }
-
-        function closeGenerateModal() {
-            document.getElementById('generateModal').classList.remove('active');
-        }
-
-        document.getElementById('generateModal').addEventListener('click', function(e) {
-            if (e.target === this) closeGenerateModal();
-        });
 
         async function doGenerate() {
             const count = parseInt(document.getElementById('genCount').value);
             const password = document.getElementById('genPassword').value.trim();
             const prefix = document.getElementById('genPrefix').value.trim();
+            const emailUtama = document.getElementById('genEmailUtama').value.trim();
 
             if (!count || count < 1 || count > 100) {
                 alert('Jumlah data harus antara 1 - 100.');
@@ -109,16 +80,15 @@
                 return;
             }
 
-            closeGenerateModal();
             document.getElementById('loading').classList.add('active');
-            const btn = document.querySelector('.container > button');
+            const btn = document.getElementById('btnGenerate');
             btn.disabled = true;
 
             try {
                 const resp = await fetch('/' + username + '/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ count: count, password: password, prefix: prefix })
+                    body: JSON.stringify({ count: count, password: password, prefix: prefix, email_utama: emailUtama })
                 });
                 const data = await resp.json();
 
