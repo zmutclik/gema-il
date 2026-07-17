@@ -64,6 +64,57 @@
     <script>
         const username = "{{ username }}";
 
+        async function saveForm() {
+            const data = {
+                count: document.getElementById('genCount').value,
+                password: document.getElementById('genPassword').value,
+                prefix: document.getElementById('genPrefix').value,
+                emailUtama: document.getElementById('genEmailUtama').value,
+            };
+            try {
+                await fetch('/' + username + '/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+            } catch(e) {}
+        }
+
+        async function loadForm() {
+            try {
+                const resp = await fetch('/' + username + '/settings');
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data.count)      document.getElementById('genCount').value = data.count;
+                if (data.password)   document.getElementById('genPassword').value = data.password;
+                if (data.prefix)     document.getElementById('genPrefix').value = data.prefix;
+                if (data.emailUtama) document.getElementById('genEmailUtama').value = data.emailUtama;
+            } catch(e) {}
+        }
+
+        // Auto-save on any input change (debounced 800ms)
+        let saveTimer = null;
+        ['genCount','genPassword','genPrefix','genEmailUtama'].forEach(function(id) {
+            document.getElementById(id).addEventListener('input', function() {
+                clearTimeout(saveTimer);
+                saveTimer = setTimeout(saveForm, 800);
+            });
+        });
+
+        // Restore on page load
+        window.addEventListener('DOMContentLoaded', loadForm);
+
+        function showMsg(text, type) {
+            const existing = document.querySelector('.msg');
+            if (existing) existing.remove();
+            const el = document.createElement('div');
+            el.className = 'msg msg-' + type;
+            el.textContent = text;
+            const container = document.querySelector('.container');
+            const formSection = document.querySelector('.form-section');
+            container.insertBefore(el, formSection);
+        }
+
         async function doGenerate() {
             const count = parseInt(document.getElementById('genCount').value);
             const password = document.getElementById('genPassword').value.trim();
@@ -80,6 +131,9 @@
                 return;
             }
 
+            // Save form before sending
+            saveForm();
+
             document.getElementById('loading').classList.add('active');
             const btn = document.getElementById('btnGenerate');
             btn.disabled = true;
@@ -93,28 +147,13 @@
                 const data = await resp.json();
 
                 if (resp.ok) {
-                    const msgDiv = document.querySelector('.msg');
-                    if (msgDiv) msgDiv.remove();
-                    const newMsg = document.createElement('div');
-                    newMsg.className = 'msg msg-ok';
-                    newMsg.textContent = '✅ ' + data.message;
-                    document.querySelector('.container').insertBefore(newMsg, document.querySelector('.container > button'));
+                    showMsg('✅ ' + data.message, 'ok');
                     setTimeout(function() { location.href = '/' + username + '/'; }, 2000);
                 } else {
-                    const msgDiv = document.querySelector('.msg');
-                    if (msgDiv) msgDiv.remove();
-                    const newMsg = document.createElement('div');
-                    newMsg.className = 'msg msg-err';
-                    newMsg.textContent = '❌ ' + (data.message || 'Gagal generate');
-                    document.querySelector('.container').insertBefore(newMsg, document.querySelector('.container > button'));
+                    showMsg('❌ ' + (data.message || 'Gagal generate'), 'err');
                 }
             } catch(err) {
-                const msgDiv = document.querySelector('.msg');
-                if (msgDiv) msgDiv.remove();
-                const newMsg = document.createElement('div');
-                newMsg.className = 'msg msg-err';
-                newMsg.textContent = '❌ Gagal terhubung ke server atau AI.';
-                document.querySelector('.container').insertBefore(newMsg, document.querySelector('.container > button'));
+                showMsg('❌ Gagal terhubung ke server atau AI.', 'err');
             } finally {
                 document.getElementById('loading').classList.remove('active');
                 btn.disabled = false;

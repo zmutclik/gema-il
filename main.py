@@ -83,6 +83,12 @@ def init_db():
                 "UPDATE records SET nama_depan = ?, nama_belakang = ? WHERE uid = ?",
                 (nama_depan, nama_belakang, row["uid"]),
             )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            username TEXT PRIMARY KEY,
+            data TEXT NOT NULL DEFAULT '{}'
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -551,8 +557,8 @@ async def generate_data(request: Request, username: str):
 Format: nama_depan,nama_belakang,email,tanggal_lahir,gender,password
 satu baris per data."""
 
-    print(f"[DEBUG] Prompt to AI ({len(prompt)} chars):")
-    print(prompt[:1000])
+    # print(f"[DEBUG] Prompt to AI ({len(prompt)} chars):")
+    # print(prompt[:1000])
     
     try:
         response = ai_client.chat.completions.create(
@@ -642,6 +648,37 @@ satu baris per data."""
 
 
 # ─── Root ─────────────────────────────────────────────────────────────────────
+
+
+@app.get("/{username}/settings")
+def get_settings(username: str):
+    """Ambil settings form generate milik username."""
+    conn = get_db()
+    row = conn.execute("SELECT data FROM settings WHERE username = ?", (username,)).fetchone()
+    conn.close()
+    if not row:
+        return JSONResponse(content={})
+    try:
+        return JSONResponse(content=json.loads(row["data"]))
+    except Exception:
+        return JSONResponse(content={})
+
+
+@app.post("/{username}/settings")
+async def save_settings(username: str, request: Request):
+    """Simpan settings form generate milik username."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(content={"message": "Invalid JSON"}, status_code=400)
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO settings (username, data) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET data = excluded.data",
+        (username, json.dumps(body)),
+    )
+    conn.commit()
+    conn.close()
+    return JSONResponse(content={"message": "ok"})
 
 
 @app.get("/favicon.ico")
