@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -306,6 +306,79 @@ def get_one_antrian(username: str, uid: str):
     )
 
 
+@app.get("/{username}/get-html/{uid}", response_class=HTMLResponse)
+def get_antrian_html(request: Request, username: str, uid: str):
+    """Ambil 1 data antrian dan tampilkan sebagai halaman HTML yang bisa dicopy."""
+    conn = get_db()
+    if uid == "new":
+        row = conn.execute(
+            "SELECT * FROM records WHERE username = ? AND status = 'antrian' ORDER BY uid ASC LIMIT 1",
+            (username,),
+        ).fetchone()
+        if not row:
+            conn.close()
+            return templates.TemplateResponse(
+                request, "antrian.html",
+                {"username": username, "nama": "", "fields": [], "error": "Tidak ada data dengan status antrian."},
+                status_code=404,
+            )
+        conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
+        conn.commit()
+        conn.close()
+        return RedirectResponse(url=f"/{username}/get-html/{row['uid']}", status_code=302)
+    else:
+        row = conn.execute(
+            "SELECT * FROM records WHERE username = ? AND uid = ?", (username, uid)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return templates.TemplateResponse(
+                request, "antrian.html",
+                {"username": username, "nama": "", "fields": [], "table_plain": "", "error": "Data tidak ditemukan."},
+                status_code=404,
+            )
+        conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
+        conn.commit()
+        conn.close()
+
+    BULAN_ID = ["", "januari", "februari", "maret", "april", "mei", "juni",
+                "juli", "agustus", "september", "oktober", "november", "desember"]
+    tgl_str = row["tanggal_lahir"]
+    try:
+        parts = tgl_str.split("-")
+        tgl_y, tgl_m, tgl_d = int(parts[0]), int(parts[1]), int(parts[2])
+        tgl_mmm = BULAN_ID[tgl_m]
+    except Exception:
+        tgl_y = tgl_m = tgl_d = 0
+        tgl_mmm = ""
+
+    nama = f"{row['nama_depan']} {row['nama_belakang']}".strip()
+    field_data = [
+        ("Nama Depan",    row["nama_depan"]),
+        ("Nama Belakang", row["nama_belakang"]),
+        ("Nama Lengkap",  nama),
+        ("Email",         row["email"]),
+        ("Email Utama",   row["email_utama"]),
+        ("Tanggal Lahir", tgl_str),
+        ("Hari Lahir",    str(tgl_d)),
+        ("Bulan Lahir",   tgl_mmm),
+        ("Tahun Lahir",   str(tgl_y)),
+        ("Gender",        row["gender"]),
+        ("Password",      row["password"]),
+    ]
+    fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
+
+    return templates.TemplateResponse(
+        request, "antrian.html",
+        {
+            "username": username,
+            "nama": nama,
+            "fields": fields,
+            "error": None,
+        },
+    )
+
+
 @app.put("/{username}/edit/{uid}")
 def edit_record(username: str, uid: str, body: dict):
     """Edit record (nama, email, tanggal_lahir, gender, password) by uid."""
@@ -569,6 +642,12 @@ satu baris per data."""
 
 
 # ─── Root ─────────────────────────────────────────────────────────────────────
+
+
+@app.get("/favicon.ico")
+def favicon():
+    from fastapi.responses import Response
+    return Response(status_code=204)
 
 
 @app.get("/")
