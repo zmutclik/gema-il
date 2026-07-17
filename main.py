@@ -542,7 +542,7 @@ async def generate_data(request: Request, username: str):
     if prefix:
         email_rule = f"email → '{prefix}' + nama_depan + 1 angka random + sedikit nama_belakang + angka random 2 sampai 4 digit + '@gmail.com'. Contoh: {prefix}budi2san23@gmail.com atau {prefix}sari1pur891@gmail.com."
     else:
-        email_rule = "email → kombinasi nama_depan + 1 angka random + nama_belakang + 4 angka random sampai 5 angka random, semua pakai @gmail.com, lowercase"
+        email_rule = "email → kombinasi nama_depan + 1 angka random + nama_belakang + 4 angka tahun sesuai tanggal lahir, semua pakai @gmail.com, lowercase"
 
     prompt = f"""Kamu adalah generator data CSV. Buatkan data CSV dengan {count} data random menggunakan kolom berikut:
 
