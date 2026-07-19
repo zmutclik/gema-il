@@ -371,6 +371,8 @@ def get_antrian_html(request: Request, username: str, uid: str):
         # ("Tahun Lahir",   str(tgl_y)),
         # ("Gender",        row["gender"]),
         ("Password",      row["password"]),
+        ("FamilyLink",      'https://familylink.google.com'),
+        ("GoogleAkun",      'google akun'),
     ]
     fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
 
