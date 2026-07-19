@@ -14,7 +14,7 @@
     body {
       font-family: system-ui, sans-serif;
       background: #f5f5f5;
-      padding: 24px;
+      padding: 16px;
     }
 
     .container {
@@ -36,16 +36,89 @@
 
     .back {
       display: inline-block;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       color: #4a90d9;
       text-decoration: none;
       font-size: 14px;
+      padding: 6px 0;
+      min-height: 44px;
+      line-height: 32px;
     }
 
     .back:hover {
       text-decoration: underline;
     }
 
+    .btn-back {
+      padding: 10px 16px;
+      background: #6c757d;
+      color: #fff !important;
+      border-radius: 6px;
+      text-decoration: none !important;
+      min-height: 44px;
+      line-height: 24px;
+      margin-bottom: 0;
+    }
+
+    .btn-back:hover {
+      background: #545b62;
+      text-decoration: none !important;
+    }
+
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .action-btns {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-gagal {
+      padding: 10px 16px;
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      min-height: 44px;
+      line-height: 24px;
+      text-align: center;
+    }
+
+    .btn-gagal:hover {
+      background: #b02a37;
+    }
+
+    .btn-lanjut {
+      padding: 10px 16px;
+      font-size: 14px;
+      background: #28a745;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      min-height: 44px;
+      line-height: 24px;
+      text-align: center;
+    }
+
+    .btn-lanjut:hover {
+      background: #1e7e34;
+    }
+
+    /* Mobile card layout for table */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -58,7 +131,7 @@
 
     th,
     td {
-      padding: 10px 14px;
+      padding: 8px 10px;
       text-align: left;
       border-bottom: 1px solid #eee;
       font-size: 14px;
@@ -77,13 +150,19 @@
       white-space: nowrap;
     }
 
+    td:nth-child(3) {
+      word-break: break-all;
+    }
+
     .cbtn {
-      padding: 3px 10px;
-      font-size: 11px;
+      padding: 6px 12px;
+      font-size: 12px;
       background: #e9ecef;
       border: 1px solid #ccc;
       border-radius: 4px;
       cursor: pointer;
+      min-height: 36px;
+      min-width: 56px;
     }
 
     .cbtn.ok {
@@ -94,39 +173,70 @@
     .toast {
       display: none;
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
       padding: 10px 18px;
       border-radius: 8px;
       background: #28a745;
       color: #fff;
       font-size: 14px;
       z-index: 999;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 520px) {
+      body { padding: 10px; }
+
+      .nav-bar { flex-direction: column; align-items: flex-start; }
+
+      .action-btns { width: 100%; }
+
+      .btn-gagal, .btn-lanjut {
+        flex: 1;
+        text-align: center;
+      }
+
+      th, td {
+        padding: 8px 10px;
+        font-size: 13px;
+      }
+
+      td:nth-child(2) {
+        width: auto;
+        white-space: normal;
+      }
     }
   </style>
 </head>
 <body style="padding: 5px;">
   <div class="container">
-    <a class="back" href="/{{ username }}/">← Kembali ke daftar</a>
+    <div class="nav-bar">
+      <a class="back btn-back" href="/{{ username }}/">← Kembali ke daftar</a>
+      {% if not error and uid is defined %}
+      <div class="action-btns">
+        <a class="btn-gagal" href="/{{ username }}/status/gagal/{{ uid }}?redirect=html"
+           onclick="return confirm('Tandai sebagai Gagal?')">Gagal</a>
+        {% if current_status == 'entry' %}
+        <a class="btn-lanjut" href="/{{ username }}/status/verivikasi/{{ uid }}?redirect=html">Verivikasi →</a>
+        {% elif current_status == 'verivikasi' %}
+        <a class="btn-lanjut" href="/{{ username }}/status/sukses/{{ uid }}?redirect=html">Sukses →</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
     {% if error %}
     <div style="background:#f8d7da;color:#721c24;padding:20px;border-radius:8px;margin-top:10px;">
       🚫 {{ error }}
     </div>
     {% else %}
     <table>
-      <thead>
-        <tr>
-          <th style="width:50px;"></th>
-          <th>Field</th>
-          <th>Nilai</th>
-        </tr>
-      </thead>
       <tbody>
         {% for i, label, val, fid in fields %}
         <tr>
-          <td><button class="cbtn" onclick="cp('{{ fid }}', this)">Copy</button></td>
-          <td>{{ label }}</td>
-          <td id="{{ fid }}">{{ val }}</td>
+          <td data-label=""><button class="cbtn" onclick="cp('{{ fid }}', this)">Copy</button></td>
+          <td data-label="Field">{{ label }}</td>
+          <td data-label="Nilai" id="{{ fid }}">{{ val }}</td>
         </tr>
         {% endfor %}
       </tbody>

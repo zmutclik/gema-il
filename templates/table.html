@@ -6,21 +6,23 @@
     <title>Data {{ username }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 20px; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 16px; }
         .container { max-width: 1100px; margin: 0 auto; }
-        h1 { color: #333; margin-bottom: 20px; }
-        .nav { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .nav a { padding: 8px 16px; background: #4a90d9; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; }
+        h1 { color: #333; margin-bottom: 16px; font-size: 20px; }
+        .nav { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+        .nav a { padding: 10px 14px; background: #4a90d9; color: #fff; text-decoration: none; border-radius: 6px; font-size: 14px; min-height: 44px; display: inline-flex; align-items: center; }
         .nav a:hover { background: #357abd; }
         .filters { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-        .filters select, .filters button { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; }
+        .filters select, .filters button { padding: 10px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; min-height: 44px; }
         .filters button { background: #28a745; color: #fff; border: none; cursor: pointer; }
         .filters button:hover { background: #218838; }
+
+        /* Desktop table */
         table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
         th { background: #4a90d9; color: #fff; font-weight: 600; }
         tr:hover { background: #f1f7ff; }
-        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
         .badge-antrian { background: #b7b7b7; color: #ffffff; }
         .badge-entry { background: #cce5ff; color: #004085; }
         .badge-verivikasi { background: #ffeeba; color: #856404; }
@@ -28,32 +30,84 @@
         .badge-gagal { background: #f8d7da; color: #721c24; }
         .empty { text-align: center; color: #888; padding: 40px; }
         .count { color: #666; margin-bottom: 10px; font-size: 14px; }
-        .btn-edit { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+        .btn-edit { background: none; border: none; cursor: pointer; font-size: 16px; padding: 6px 8px; min-height: 36px; min-width: 36px; }
         .btn-edit:hover { background: #e8e8e8; border-radius: 4px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: flex-end; }
         .modal.active { display: flex; }
-        .modal-content { background: #fff; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-        .modal-content h2 { margin-bottom: 20px; color: #333; }
+        .modal-content { background: #fff; padding: 24px; border-radius: 12px 12px 0 0; max-width: 500px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .modal-content h2 { margin-bottom: 16px; color: #333; font-size: 18px; }
         .modal-content label { display: block; font-weight: 600; margin-bottom: 4px; margin-top: 12px; color: #333; font-size: 13px; }
-        .modal-content input, .modal-content select { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+        .modal-content input, .modal-content select { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; min-height: 44px; }
         .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
-        .modal-actions button { padding: 8px 20px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; }
+        .modal-actions button { padding: 10px 20px; border-radius: 6px; border: none; cursor: pointer; font-size: 15px; min-height: 44px; }
         .btn-save { background: #28a745; color: #fff; }
         .btn-save:hover { background: #218838; }
         .btn-cancel { background: #6c757d; color: #fff; }
         .btn-cancel:hover { background: #5a6268; }
-        .toast { display: none; position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 14px; z-index: 2000; }
+        .toast { display: none; position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 14px; z-index: 2000; white-space: nowrap; }
         .toast-ok { background: #28a745; }
         .toast-err { background: #dc3545; }
+
+        /* Mobile responsive */
+        @media (max-width: 700px) {
+            body { padding: 10px; }
+            h1 { font-size: 17px; }
+            .nav a { font-size: 13px; padding: 8px 10px; }
+
+            /* Stack table as cards */
+            table, thead, tbody, th, td, tr { display: block; }
+            thead { display: none; }
+            tr {
+                background: #fff;
+                border-radius: 8px;
+                box-shadow: 0 1px 4px rgba(0,0,0,.1);
+                margin-bottom: 12px;
+                padding: 12px;
+                position: relative;
+            }
+            tr:hover { background: #fff; }
+            td {
+                border: none;
+                padding: 4px 0;
+                font-size: 13px;
+                display: flex;
+                gap: 8px;
+                align-items: flex-start;
+            }
+            td::before {
+                content: attr(data-label);
+                font-weight: 700;
+                color: #888;
+                font-size: 11px;
+                text-transform: uppercase;
+                min-width: 80px;
+                padding-top: 2px;
+                flex-shrink: 0;
+            }
+            td:last-child {
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                padding: 0;
+            }
+            td:last-child::before { display: none; }
+
+            .modal { align-items: flex-end; }
+            .modal-content { border-radius: 16px 16px 0 0; padding: 20px 16px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📋 Data User: {{ username }}</h1>
         <div class="nav">
-            <a href="/{{ username }}/get-html/new" style="padding:8px 16px;background:#6f42c1;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">📋 Antrian</a>
+            <a href="/{{ username }}/get-html/new" style="background:#6f42c1;">🆕 New Antrian</a>
+            <a href="/{{ username }}/get-html/entry" style="background:#0d6efd;">📝 Data Entry</a>
+            <a href="/{{ username }}/get-html/verivikasi" style="background:#fd7e14;">🔍 Data Verivikasi</a>
             <a href="/{{ username }}/generate">🤖 Generate Data</a>
-            <button onclick="confirmClear()" style="padding:8px 16px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🗑️ Clear Data</button>
+            <button onclick="confirmClear()" style="padding:10px 14px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;min-height:44px;">🗑️ Clear Data</button>
         </div>
         <p class="count">Total: {{ total }} data</p>
 
@@ -68,20 +122,20 @@
                     <th>Gender</th>
                     <th>Password</th>
                     <th>Status</th>
-                    <th style="width: 100px;">Aksi</th>
+                    <th style="width: 120px;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
                 {% for r in rows %}
                 <tr>
-                    <td>{{ r.nama_depan }} {{ r.nama_belakang }}</td>
-                    <td>{{ r.email }}</td>
-                    <td>{{ r.email_utama }}</td>
-                    <td>{{ r.tanggal_lahir }}</td>
-                    <td>{{ r.gender }}</td>
-                    <td>{{ r.password }}</td>
-                    <td><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
-                    <td>
+                    <td data-label="Nama">{{ r.nama_depan }} {{ r.nama_belakang }}</td>
+                    <td data-label="Email">{{ r.email }}</td>
+                    <td data-label="Email Utama">{{ r.email_utama }}</td>
+                    <td data-label="Tgl Lahir">{{ r.tanggal_lahir }}</td>
+                    <td data-label="Gender">{{ r.gender }}</td>
+                    <td data-label="Password">{{ r.password }}</td>
+                    <td data-label="Status"><span class="badge badge-{{ r.status }}">{{ r.status }}</span></td>
+                    <td data-label="Aksi">
                         <button class="btn-edit"
                             onclick="openEdit(
                                 '{{ r.uid | e }}',

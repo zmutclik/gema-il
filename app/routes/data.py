@@ -130,6 +130,90 @@ def get_one_antrian(username: str, uid: str):
     )
 
 
+@router.get("/{username}/get-html/entry", response_class=HTMLResponse)
+def get_entry_html(request: Request, username: str):
+    """Ambil 1 data status 'entry' dan tampilkan sebagai halaman HTML."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM records WHERE username = ? AND status = 'entry' ORDER BY uid ASC LIMIT 1",
+        (username,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return templates.TemplateResponse(
+            request, "antrian.html",
+            {"username": username, "nama": "", "fields": [], "error": "Tidak ada data dengan status entry."},
+            status_code=404,
+        )
+    conn.close()
+
+    tgl = parse_tanggal(row["tanggal_lahir"])
+    nama = f"{row['nama_depan']} {row['nama_belakang']}".strip()
+    field_data = [
+        ("Nama Depan",    row["nama_depan"]),
+        ("Nama Belakang", row["nama_belakang"]),
+        ("Email Bapak",   row["email_utama"]),
+        ("Email Anak",    row["email"]),
+        ("Password",      row["password"]),
+        ("FamilyLink",    "family link"),
+        ("GoogleAkun",    "google akun"),
+    ]
+    fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
+
+    return templates.TemplateResponse(
+        request, "antrian.html",
+        {
+            "username": username,
+            "uid": row["uid"],
+            "current_status": "entry",
+            "nama": nama,
+            "fields": fields,
+            "error": None,
+        },
+    )
+
+@router.get("/{username}/get-html/verivikasi", response_class=HTMLResponse)
+def get_verivikasi_html(request: Request, username: str):
+    """Ambil 1 data status 'verivikasi' dan tampilkan sebagai halaman HTML."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT * FROM records WHERE username = ? AND status = 'verivikasi' ORDER BY uid ASC LIMIT 1",
+        (username,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return templates.TemplateResponse(
+            request, "antrian.html",
+            {"username": username, "nama": "", "fields": [], "error": "Tidak ada data dengan status verivikasi."},
+            status_code=404,
+        )
+    conn.close()
+
+    tgl = parse_tanggal(row["tanggal_lahir"])
+    nama = f"{row['nama_depan']} {row['nama_belakang']}".strip()
+    field_data = [
+        ("Nama Depan",    row["nama_depan"]),
+        ("Nama Belakang", row["nama_belakang"]),
+        ("Email Bapak",   row["email_utama"]),
+        ("Email Anak",    row["email"]),
+        ("Password",      row["password"]),
+        ("FamilyLink",    "family link"),
+        ("GoogleAkun",    "google akun"),
+    ]
+    fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
+
+    return templates.TemplateResponse(
+        request, "antrian.html",
+        {
+            "username": username,
+            "uid": row["uid"],
+            "current_status": "verivikasi",
+            "nama": nama,
+            "fields": fields,
+            "error": None,
+        },
+    )
+
 @router.get("/{username}/get-html/{uid}", response_class=HTMLResponse)
 def get_antrian_html(request: Request, username: str, uid: str):
     """Ambil 1 data antrian dan tampilkan sebagai halaman HTML yang bisa dicopy."""
@@ -161,8 +245,9 @@ def get_antrian_html(request: Request, username: str, uid: str):
                 {"username": username, "nama": "", "fields": [], "table_plain": "", "error": "Data tidak ditemukan."},
                 status_code=404,
             )
-        conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
-        conn.commit()
+        if row["status"] == "antrian":
+            conn.execute("UPDATE records SET status = 'entry' WHERE uid = ?", (row["uid"],))
+            conn.commit()
         conn.close()
 
     tgl = parse_tanggal(row["tanggal_lahir"])
@@ -182,6 +267,8 @@ def get_antrian_html(request: Request, username: str, uid: str):
         request, "antrian.html",
         {
             "username": username,
+            "uid": row["uid"],
+            "current_status": row["status"],
             "nama": nama,
             "fields": fields,
             "error": None,
@@ -267,8 +354,8 @@ def delete_record(username: str, uid: str):
 
 
 @router.get("/{username}/status/{status}/{uid}")
-def update_status(username: str, uid: str, status: str):
-    """Update status record berdasarkan uid."""
+def update_status(username: str, uid: str, status: str, redirect: str = Query("")):
+    """Update status record berdasarkan uid. Jika dipanggil dari browser (redirect=html), redirect ke get-html."""
     conn = get_db()
     cursor = conn.execute(
         "UPDATE records SET status = ? WHERE username = ? AND uid = ? AND status != ?",
@@ -277,6 +364,9 @@ def update_status(username: str, uid: str, status: str):
     conn.commit()
     updated = cursor.rowcount
     conn.close()
+
+    if redirect == "html":
+        return RedirectResponse(url=f"/{username}/get-html/{uid}", status_code=302)
 
     if updated == 0:
         return JSONResponse(
