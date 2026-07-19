@@ -51,30 +51,10 @@
     <div class="container">
         <h1>📋 Data User: {{ username }}</h1>
         <div class="nav">
+            <a href="/{{ username }}/get-html/new" style="padding:8px 16px;background:#6f42c1;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">📋 Antrian</a>
             <a href="/{{ username }}/generate">🤖 Generate Data</a>
-            <a href="/{{ username }}/get/new">🎯 Ambil Antrian</a>
-            <a href="/{{ username }}/get-html/new" style="padding:8px 16px;background:#6f42c1;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;">📋 Ambil Antrian HTML</a>
             <button onclick="confirmClear()" style="padding:8px 16px;background:#dc3545;color:#fff;border:none;border-radius:6px;font-size:14px;cursor:pointer;">🗑️ Clear Data</button>
         </div>
-        <form class="filters" method="get">
-            <label>Status:</label>
-            <select name="status">
-                <option value="">Semua</option>
-                <option value="antrian" {% if sel_status == 'antrian' %}selected{% endif %}>Antrian</option>
-                <option value="entry" {% if sel_status == 'entry' %}selected{% endif %}>Entry</option>
-                <option value="verivikasi" {% if sel_status == 'verivikasi' %}selected{% endif %}>Verivikasi</option>
-                <option value="sukses" {% if sel_status == 'sukses' %}selected{% endif %}>Sukses</option>
-                <option value="gagal" {% if sel_status == 'gagal' %}selected{% endif %}>Gagal</option>
-            </select>
-            <label>Gender:</label>
-            <select name="gender">
-                <option value="">Semua</option>
-                <option value="P" {% if sel_gender == 'P' %}selected{% endif %}>Pria</option>
-                <option value="W" {% if sel_gender == 'W' %}selected{% endif %}>Wanita</option>
-            </select>
-            <button type="submit">🔍 Filter</button>
-            <a href="/{{ username }}/" style="padding:8px 12px;color:#dc3545;text-decoration:none;">Reset</a>
-        </form>
         <p class="count">Total: {{ total }} data</p>
 
         {% if rows %}
