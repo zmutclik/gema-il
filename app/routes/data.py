@@ -150,13 +150,12 @@ def get_entry_html(request: Request, username: str):
     tgl = parse_tanggal(row["tanggal_lahir"])
     nama = f"{row['nama_depan']} {row['nama_belakang']}".strip()
     field_data = [
-        ("Nama Depan",    row["nama_depan"]),
-        ("Nama Belakang", row["nama_belakang"]),
-        ("Email Bapak",   row["email_utama"]),
-        ("Email Anak",    row["email"]),
+        ("UID",    row["uid"]),
+        ("Depan",    row["nama_depan"]),
+        ("Belakang", row["nama_belakang"]),
+        ("Bapak",   row["email_utama"]),
+        ("Anak",    row["email"]),
         ("Password",      row["password"]),
-        ("FamilyLink",    "family link"),
-        ("GoogleAkun",    "google akun"),
     ]
     fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
 
