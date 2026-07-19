@@ -1,76 +1,162 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Antrian – {{ nama }}</title>
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 24px; }
-.container { max-width: 680px; margin: 0 auto; }
-h1 { color: #333; margin-bottom: 6px; font-size: 20px; }
-.sub { color: #666; font-size: 13px; margin-bottom: 20px; }
-.back { display: inline-block; margin-bottom: 16px; color: #4a90d9; text-decoration: none; font-size: 14px; }
-.back:hover { text-decoration: underline; }
-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.1); margin-bottom: 20px; }
-th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
-th { background: #4a90d9; color: #fff; font-weight: 600; }
-td:first-child { font-weight: 600; color: #555; width: 140px; white-space: nowrap; }
-.cbtn { padding: 3px 10px; font-size: 11px; background: #e9ecef; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; }
-.cbtn.ok { background: #d4edda; border-color: #b8dfc4; }
-.toast { display: none; position: fixed; bottom: 20px; right: 20px; padding: 10px 18px; border-radius: 8px; background: #28a745; color: #fff; font-size: 14px; z-index: 999; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Antrian – {{ nama }}</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f5f5f5;
+      padding: 24px;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 6px;
+      font-size: 20px;
+    }
+
+    .sub {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    .back {
+      display: inline-block;
+      margin-bottom: 16px;
+      color: #4a90d9;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .back:hover {
+      text-decoration: underline;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
+      margin-bottom: 20px;
+    }
+
+    th,
+    td {
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+
+    th {
+      background: #4a90d9;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    td:first-child {
+      font-weight: 600;
+      color: #555;
+      width: 140px;
+      white-space: nowrap;
+    }
+
+    .cbtn {
+      padding: 3px 10px;
+      font-size: 11px;
+      background: #e9ecef;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .cbtn.ok {
+      background: #d4edda;
+      border-color: #b8dfc4;
+    }
+
+    .toast {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      background: #28a745;
+      color: #fff;
+      font-size: 14px;
+      z-index: 999;
+    }
+  </style>
 </head>
-<body>
-<div class="container">
-  <a class="back" href="/{{ username }}/">← Kembali ke daftar</a>
-  {% if error %}
-  <div style="background:#f8d7da;color:#721c24;padding:20px;border-radius:8px;margin-top:10px;">
-    🚫 {{ error }}
+<body style="padding: 5px;">
+  <div class="container">
+    <a class="back" href="/{{ username }}/">← Kembali ke daftar</a>
+    {% if error %}
+    <div style="background:#f8d7da;color:#721c24;padding:20px;border-radius:8px;margin-top:10px;">
+      🚫 {{ error }}
+    </div>
+    {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Nilai</th>
+          <th style="width:70px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i, label, val, fid in fields %}
+        <tr>
+          <td>{{ label }}</td>
+          <td id="{{ fid }}">{{ val }}</td>
+          <td><button class="cbtn" onclick="cp('{{ fid }}', this)">Copy</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
   </div>
-  {% else %}
-  <h1>📋 Data Antrian</h1>
-  <p class="sub">Data berhasil diambil dan status diubah menjadi <strong>entry</strong>.</p>
-  <table>
-    <thead>
-      <tr><th>Field</th><th>Nilai</th><th style="width:70px;"></th></tr>
-    </thead>
-    <tbody>
-      {% for i, label, val, fid in fields %}
-      <tr>
-        <td>{{ label }}</td>
-        <td id="{{ fid }}">{{ val }}</td>
-        <td><button class="cbtn" onclick="cp('{{ fid }}', this)">Copy</button></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-</div>
-<div class="toast" id="toast"></div>
-<script>
-function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-  return new Promise((resolve) => {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
-    document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    resolve();
-  });
-}
-function cp(id, btn) {
-  const text = document.getElementById(id).textContent;
-  copyToClipboard(text).then(() => {
-    btn.textContent = '✓'; btn.classList.add('ok');
-    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1200);
-  });
-}
-</script>
+  <div class="toast" id="toast"></div>
+  <script>
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      return new Promise((resolve) => {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve();
+      });
+    }
+    function cp(id, btn) {
+      const text = document.getElementById(id).textContent;
+      copyToClipboard(text).then(() => {
+        btn.textContent = '✓'; btn.classList.add('ok');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 1200);
+      });
+    }
+  </script>
 </body>
 </html>

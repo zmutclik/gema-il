@@ -362,14 +362,14 @@ def get_antrian_html(request: Request, username: str, uid: str):
     field_data = [
         ("Nama Depan",    row["nama_depan"]),
         ("Nama Belakang", row["nama_belakang"]),
-        ("Nama Lengkap",  nama),
-        ("Email",         row["email"]),
-        ("Email Utama",   row["email_utama"]),
-        ("Tanggal Lahir", tgl_str),
-        ("Hari Lahir",    str(tgl_d)),
-        ("Bulan Lahir",   tgl_mmm),
-        ("Tahun Lahir",   str(tgl_y)),
-        ("Gender",        row["gender"]),
+        # ("Nama Lengkap",  nama),
+        ("Email Bapak",   row["email_utama"]),
+        ("Email Anak",         row["email"]),
+        # ("Tanggal Lahir", tgl_str),
+        # ("Hari Lahir",    str(tgl_d)),
+        # ("Bulan Lahir",   tgl_mmm),
+        # ("Tahun Lahir",   str(tgl_y)),
+        # ("Gender",        row["gender"]),
         ("Password",      row["password"]),
     ]
     fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
