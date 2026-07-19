@@ -137,17 +137,39 @@
   <script>
     function copyToClipboard(text) {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
+        return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
       }
-      return new Promise((resolve) => {
+      return fallbackCopy(text);
+    }
+
+    function fallbackCopy(text) {
+      return new Promise((resolve, reject) => {
         const ta = document.createElement('textarea');
         ta.value = text;
-        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:absolute;left:-10000px;top:-10000px;opacity:0;';
         document.body.appendChild(ta);
-        ta.focus(); ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-        resolve();
+
+        const range = document.createRange();
+        range.selectNodeContents(ta);
+
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        ta.setSelectionRange(0, 999999);
+        ta.focus();
+
+        try {
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          sel.removeAllRanges();
+          ok ? resolve() : reject(new Error('execCommand failed'));
+        } catch (e) {
+          document.body.removeChild(ta);
+          sel.removeAllRanges();
+          reject(e);
+        }
       });
     }
     function cp(id, btn) {
