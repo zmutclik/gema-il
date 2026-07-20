@@ -196,8 +196,6 @@ def get_verivikasi_html(request: Request, username: str):
         ("Email Bapak",   row["email_utama"]),
         ("Email Anak",    row["email"]),
         ("Password",      row["password"]),
-        ("FamilyLink",    "family link"),
-        ("GoogleAkun",    "google akun"),
     ]
     fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
 
@@ -257,8 +255,6 @@ def get_antrian_html(request: Request, username: str, uid: str):
         ("Email Bapak",   row["email_utama"]),
         ("Email Anak",    row["email"]),
         ("Password",      row["password"]),
-        ("FamilyLink",    "family link"),
-        ("GoogleAkun",    "google akun"),
     ]
     fields = [(i, label, val, f"f{i}") for i, (label, val) in enumerate(field_data)]
 
